@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "pact-app-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/pactApp/PactAppWebPart.js",
+          "manifest": "./src/webparts/pactApp/PactAppWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "PactAppWebPartStrings": "lib/webparts/pactApp/loc/{locale}.js"
+  }
+}

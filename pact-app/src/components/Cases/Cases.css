@@ -1,0 +1,153 @@
+.cases-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cases-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-icon {
+  color: var(--text-muted);
+}
+
+.search-bar input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+.cases-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.cases-table-container {
+  overflow-x: auto;
+  border-radius: var(--radii-md);
+}
+
+.pact-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.pact-table th {
+  padding: 16px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-light);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.pact-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.pact-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.pact-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.text-white {
+  color: var(--text-primary);
+}
+
+.person-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.person-avatar {
+  width: 28px;
+  height: 28px;
+  background: var(--bg-surface-hover);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-unpaid {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--status-warning);
+}
+
+.status-paid {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--status-success);
+}
+
+.status-overdue {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--status-danger);
+}
+
+.status-waived {
+  background: rgba(157, 163, 180, 0.2);
+  color: var(--text-secondary);
+}
+
+.link-action {
+  font-weight: 500;
+  color: var(--secondary);
+}
+
+.link-action:hover {
+  text-decoration: underline;
+}
+
+.loading-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}

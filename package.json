@@ -1,0 +1,12 @@
+{
+  "name": "pact-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix pact-app",
+    "build": "npm run build --prefix pact-app",
+    "preview": "npm run preview --prefix pact-app"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.5.17"
+  }
+}

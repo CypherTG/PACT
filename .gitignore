@@ -1,0 +1,18 @@
+node_modules/
+.vercel/
+.env*.local
+.env
+*.log
+scratch/
+dist/
+build/
+temp/
+.vscode/
+*.zip
+*.pptx
+*.docx
+# Ignore SPFx specific build folders in subdirectories
+**/lib/
+**/temp/
+**/dist/
+**/node_modules/

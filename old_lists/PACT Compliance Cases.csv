@@ -1,0 +1,14 @@
+﻿"Penalty ID","Offence Category","Charged Person ","Charged Person Email","Secondary Contact Email","Tier","Disciplinary Action","Penalty Amount","Issuer Name","Status","Due Date","Date Created ","Evidence","Department","Category"
+"5","Late to Work/Site","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","P5","₦ 5,000.00","Muyis Rafiu Bello","Unpaid","4/11/2026","4/6/2026",,"business support","Conduct"
+,"Disrespectful Conduct","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","P5 & 1% KREST Deduction","₦ 5,000.00",,"Unpaid",,"4/6/2026",,"Business Support",
+,"Falsification of Records","Oluwaforefunmi Ogbonaiye","oogbonaiye@konstructum.com","mbello@konstructum.com","Tier 2","P5 & CBT","₦ 5,000.00",,"Unpaid","4/8/2026","4/7/2026",,"HR",
+,"Confidentiality Breach","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com",,"Same + Unpaid Leave",,,"Unpaid",,"4/10/2026",,"IT","EHSQ"
+,"Working Without PPE","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","VW","₦ 0.00",,"Unpaid","4/11/2026","4/10/2026",,"IT","EHSQ"
+,"DDP Contravention","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 2","P5 & 1% KREST Deduction + Chairman Session","₦ 5,000.00",,"Unpaid","4/21/2026","4/10/2026",,"IT","Strategic"
+,"Late to Work/Site","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","P5 & 1% KREST Deduction","₦ 5,000.00",,"Unpaid","4/7/2026","4/10/2026",,"Business Support","Conduct"
+,"Conflict of Interest","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 3","Same + Unpaid Leave","₦ 5,000.00",,"Unpaid","4/21/2026","4/10/2026",,"Business support","Strategic"
+,"Dress Policy Contravention","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","P5 & 1% KREST Deduction","₦ 5,000.00",,"Unpaid","4/13/2026","4/10/2026",,"business support","Project Integrity"
+"1","Working Without PPE","Bello Muyis","mbello@konstructum.com","mbello@konstructum.com","Tier 1","Expulsion","₦ 0.00",,"Unpaid",,"4/12/2026",,,"EHSQ"
+,"DDP Contravention","Bello Muyis","mbello@konstructum.com","mbello@gmail.com","Tier 2","P5 & 1% KREST Deduction + Chairman Session","₦ 5,000.00",,"Unpaid","4/13/2026","4/13/2026",,"Business Support","EHSQ"
+,,,,,,,,,"Unpaid",,"4/13/2026",,,
+,"Working Without PPE","Ibereayo Amoo","iamoo@konstructum.com","abalogun@konstructum.com","Tier 1","VW","₦ 0.00",,"Unpaid","4/14/2026","4/13/2026",,,"EHSQ"

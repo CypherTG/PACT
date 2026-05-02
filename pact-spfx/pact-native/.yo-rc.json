@@ -1,0 +1,23 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "whichFolder": "subdir",
+    "solutionName": "pact-native",
+    "environment": "spo",
+    "packageManager": "npm",
+    "skipFeatureDeployment": true,
+    "useGulp": false,
+    "componentType": "webpart",
+    "template": "react",
+    "componentName": "PACTApp",
+    "componentDescription": "PACT Compliance Platform - Native Web Part",
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.15.0",
+    "sdksVersions": {},
+    "version": "1.22.2",
+    "libraryName": "pact-native",
+    "libraryId": "ad2d092c-f3df-4ff9-b378-139c23817e72",
+    "solutionShortDescription": "pact-native description",
+    "isDomainIsolated": false
+  }
+}
