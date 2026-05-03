@@ -126,5 +126,5 @@ export const APPEAL_DECISIONS = ['Upheld', 'Reduced', 'Waived', 'Rejected'] as c
 export const RISK_LEVELS = ['Low', 'Medium', 'High', 'Critical'] as const;
 
 // ─── Escalation Rules ───────────────────────────────────────────────────────
-export const ESCALATION_THRESHOLD = 3; // Number of Tier 1 offences in history to trigger escalation on the NEXT one (e.g. 3 existing + 1 current = 4 total)
+export const ESCALATION_THRESHOLD = 2; // Escalate when existing Tier 1 count reaches 2 (i.e. 3rd offence triggers upgrade to Tier 2)
 export const ESCALATION_WINDOW_MONTHS = 6; // Rolling window in months

@@ -1,36 +1,54 @@
-﻿"Offence Name","Tier","Category","OffenceDescription","DefaultPenaltyAmount","FirstOffenceAction","SecondOffenceAction","ThirdOffenceAction"
-"Unauthorized Absence","Tier 1","Conduct",,,"Written Warning","P5","P10"
-"Late to Work/Site","Tier 1","Conduct",,,"Verbal Warning","P5","P10"
-"Office Lime Contravention","Tier 2","Conduct",,,"Written Warning","P5","P10"
-"Dress Policy Contravention","Tier 1","Conduct",,,"Verbal Warning","P5","P10"
-"DDP Contravention","Tier 2","Strategic",,,"Written Warning","P5","P10"
-"Office Cleanliness Violation","Tier 1","Conduct",,,"Written Warning","P5","P10"
-"Disrespectful Conduct","Tier 1","Conduct",,,"Written Warning","P5","P10"
-"Unauthorized Document Release","Tier 2","Project Integrity",,,"Written Warning","P5","P10"
-"Procurement Policy Breach","Tier 2","Project Integrity",,,"P5","P10","Suspension"
-"Falsification of Records","Tier 2","Project Integrity",,,"P5","P10","Termination"
-"Confidentiality Breach","Tier 3","Strategic",,,"Suspension","Termination","Termination"
-"Conflict of Interest","Tier 3","Strategic",,,"Suspension","Termination","Termination"
-"Fraud or Financial Misconduct","Tier 3","Strategic",,,"Suspension","Termination","Termination"
-,"Tier 3","Strategic",,,"Suspension","Termination","Termination"
-"Gross Negligence or Wilful Safety Violation","Tier 3","EHSQ",,,"Disciplinary Action","Disciplinary Action","Termination"
-"Tampering with Equipment or Machinery","Tier 3","EHSQ",,,"Written Warning","Suspension (2 weeks)","Termination"
-"Failure to Attend Mandatory HSE Trainings",,"EHSQ",,,,,"Written Warning"
-"Failure to Complete BUILDSAFE Scoreboard","Tier 1","EHSQ",,,"P5","P10","Written Warning"
-"Falsification of BUILDSAFE Scoreboard Data",,"EHSQ",,,,,
-"Bribery Theft Vandalism or Fraud","Tier 3","EHSQ",,,,,
-"Substance Abuse on Duty","Tier 3","EHSQ",,,,,
-"Failure to Report Incidents Within 24hrs","Tier 1","EHSQ",,,,"Written Warning",
-"Damage to KCC Property Due to Negligence","Tier 2","EHSQ",,,,"Written Warning","Termination"
-"Quality Non-Conformance or Record Falsification","Tier 2","EHSQ",,,,"Suspension (2 weeks)","Termination"
-"Unauthorized Entry or Bringing Unauthorized Persons","Tier 1","EHSQ",,,,,"Suspension (2 weeks)"
-"Non-Conformance to BUILDSAFE Procedures","Tier 2","EHSQ",,,,"Written Warning","Suspension (2 weeks)"
-"Non-Conformance to EHSQ Policies","Tier 1","EHSQ",,,,"Written Warning",
-"Driving Without Seatbelt or Valid Licence","Tier 1","EHSQ",,,"P5 + Written Warning","Retrieve Vehicle","-"
-"Working Without Valid PTW","Tier 2","EHSQ",,,"P10","Written Warning","Suspension (2 weeks)"
-"Harassment Threats or Workplace Violence","Tier 2","EHSQ",,,"Written Warning + Disciplinary Action","Termination","-"
-"Mobilization Without Valid Regulatory Permits","Tier 3","EHSQ",,,"Suspension (1 week) + Written Warning",,
-"No HSE Officer on Site","Tier 2","EHSQ",,,"P5","Written Warning","Suspension (2 weeks)"
-"Working Without PPE","Tier 1","EHSQ",,,"Verbal Warning","Suspension (1 weeks)","Expulsion"
-"Non-Compliance to EHSQ Pre-Mobilization Requirements","Tier 2","EHSQ",,,"P5","Written Warning","Suspension (2 weeks)"
-,,,,,,,
+﻿"Offence Name","Category","DefaultPenaltyAmount","Tier","FirstOffenceAction","SecondOffenceAction","ThirdOffenceAction"
+"Office Lime Contravention","Conduct","₦ 5,000.00","Tier 2","P5 & CBT","P5 & 1% KREST Deduction ","P5 & 1% KREST Deduction + Chairman Session"
+"Dress Policy Contravention","Conduct","₦ 5,000.00","Tier 1","P5","P5 & CBT","P5 & 1% KREST Deduction"
+"DDP Contravention","Strategic","₦ 5,000.00","Tier 2","P5 & CBT","P5 & 1% KREST Deduction ","P5 & 1% KREST Deduction + Chairman Session"
+"Late to Work/Site","Conduct","₦ 5,000.00","Tier 1","P5","P5 & CBT","P5 & 1% KREST Deduction"
+"Unauthorized Absence","Conduct","₦ 5,000.00","Tier 1","P5","P5 & CBT","P5 & 1% KREST Deduction"
+"Office Cleanliness Violation","Conduct","₦ 5,000.00","Tier 1","P5","P5 & CBT","P5 & 1% KREST Deduction"
+"Disrespectful Conduct","Conduct","₦ 5,000.00","Tier 1","P5","P5 & CBT","P5 & 1% KREST Deduction"
+"Unauthorized Document Release","Project Integrity","₦ 5,000.00","Tier 2","P5 & CBT","P5 & 1% KREST Deduction ","P5 & 1% KREST Deduction + Chairman Session"
+"Procurement Policy Breach","Project Integrity","₦ 5,000.00","Tier 2","P5 & CBT","P5 & 1% KREST Deduction ","P5 & 1% KREST Deduction + Chairman Session"
+"Falsification of Records","Project Integrity","₦ 5,000.00","Tier 2","P5 & CBT","P5 & 1% KREST Deduction ","P5 & 1% KREST Deduction + Chairman Session"
+"Confidentiality Breach","Strategic","₦ 5,000.00","Tier 3","P5 & Chairman Session","P5 & Chairman Session + Termination Possible","Same + Unpaid Leave"
+"Conflict of Interest","Strategic","₦ 5,000.00","Tier 3","P5 & Chairman Session","P5 & Chairman Session + Termination Possible","Same + Unpaid Leave"
+"Fraud or Financial Misconduct","Strategic","₦ 5,000.00","Tier 3","P5 & Chairman Session","P5 & Chairman Session + Termination Possible","Same + Unpaid Leave"
+"Reputational Damage to Company","Strategic","₦ 5,000.00","Tier 3","P5 & Chairman Session","P5 & Chairman Session + Termination Possible","Same + Unpaid Leave"
+"Gross Negligence or Wilful Safety Violation","EHSQ","₦ 0.00","Tier 3","Disciplinary actions","Disciplinary actions","Termination"
+"Tampering with Equipment or Machinery","EHSQ","₦ 5,000.00","Tier 3","Written Warning","Suspension (2 week)","Termination"
+"Failure to Attend Mandatory HSE Trainings","EHSQ","₦ 5,000.00","Tier 1","P5","P10","Written Warning"
+"Failure to Complete BUILDSAFE Scoreboard","EHSQ","₦ 10,000.00","Tier 1","P5","P10","Written Warning"
+"Falsification of BUILDSAFE Scoreboard Data","EHSQ","₦ 0.00","Tier 2","P10+Written Warning","Suspension (2 week)","Termination"
+"Bribery Theft Vandalism or Fraud","EHSQ","₦ 0.00","Tier 3","Termination and Prosecution","Termination and Prosecution","Termination and Prosecution"
+"Substance Abuse on Duty","EHSQ","₦ 5,000.00","Tier 3","Termination","Termination","Termination"
+"Failure to Report Incidents Within 24hrs","EHSQ","₦ 100,000.00","Tier 1","P5","Written Warning","Suspension (2 week)"
+"Damage to KCC Property Due to Negligence","EHSQ","₦ 0.00","Tier 2","P10","Written Warning","Termination"
+"Quality Non-Conformance or Record Falsification","EHSQ","₦ 5,000.00","Tier 2","Suspension (2 week)+Written Warning","Suspension (4 week)","Termination"
+"Unauthorized Entry or Bringing Unauthorized Persons","EHSQ","₦ 10,000.00","Tier 1","P5","Written Warning","Suspension (2 week)"
+"Non-Conformance to BUILDSAFE Procedures","EHSQ","₦ 5,000.00","Tier 2","P10","Written Warning","Suspension (2 week)"
+"Non-Conformance to EHSQ Policies","EHSQ","₦ 5,000.00","Tier 1","P5","Written Warning","Disciplinary Action"
+"Driving Without Seatbelt or Valid Licence","EHSQ","₦ 10,000.00","Tier 1","P5+Written Warning","Retrieve Vehicle","-"
+"Working Without Valid PTW","EHSQ","₦ 0.00","Tier 2","P10","Written Warning","Suspension (2 week)"
+"Harassment Threats or Workplace Violence","EHSQ","₦ 0.00","Tier 2","Written Warning+Disciplinary Action","Termination","-"
+"Mobilization Without Valid Regulatory Permits","EHSQ","₦ 5,000.00","Tier 3","Suspension (1 week)+Written Warning","Suspension (4 week)","Termination"
+"No HSE Officer on Site","EHSQ","₦ 0.00","Tier 2","P5","Written Warning","Suspension (2 week)"
+"Working Without PPE","EHSQ","₦ 5,000.00","Tier 1","Verbal Warning","Suspension (1 week)","Expulsion"
+"Non-Compliance to EHSQ Pre-Mobilization Requirements","EHSQ","₦ 0.00","Tier 2","P5","Written Warning","Suspension (2 week)"
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,

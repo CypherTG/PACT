@@ -71,9 +71,11 @@ export const NewCaseForm: React.FC = () => {
   
   const offenceCount = useMemo(() => {
     if (!selectedPolicy) return 1;
-    return selectedPolicy.tier === 'Tier 1' 
-      ? (staffHistory?.tier1Last6Months || 0) + 1 
-      : 1;
+    if (!staffHistory) return 1;
+    if (selectedPolicy.tier === 'Tier 1') return (staffHistory.tier1Last6Months || 0) + 1;
+    if (selectedPolicy.tier === 'Tier 2') return (staffHistory.tier2Offences || 0) + 1;
+    if (selectedPolicy.tier === 'Tier 3') return (staffHistory.tier3Offences || 0) + 1;
+    return 1;
   }, [selectedPolicy, staffHistory]);
   
   const isEscalated = useMemo(() => {

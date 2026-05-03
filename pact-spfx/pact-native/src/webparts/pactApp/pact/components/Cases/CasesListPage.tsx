@@ -10,7 +10,7 @@ export const CasesListPage: React.FC = () => {
   const { data: cases, loading, refresh } = useSharePointCollection<ComplianceCase>(() => sharePointService.getCases());
 
   const filteredCases = cases.filter(c => 
-    c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
     (c.chargedPersonName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -76,8 +76,8 @@ export const CasesListPage: React.FC = () => {
                   <td>{c.offenceCategoryName || 'Unknown'}</td>
                   <td>{new Date(c.dueDate).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status-badge status-${c.status.toLowerCase()}`}>
-                      {c.status}
+                    <span className={`status-badge status-${(c.status || 'pending').toLowerCase()}`}>
+                      {c.status || 'Pending'}
                     </span>
                   </td>
                   <td>

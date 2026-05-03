@@ -11,11 +11,13 @@ import type {
 import { escalationEngine } from './EscalationEngine';
 
 // Direct data import for local mode
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const staffData = require('../data/staffDirectory.json');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const policyData = require('../data/policyLibrary.json');
 
 // PLACEHOLDER: Power Automate HTTP Trigger URL
-const POWER_AUTOMATE_URL = 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/542b00c131884a3e8235161bb10bd625/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EMA0sCNKGWx86m-cXU5EyhZCq3lbbB-pSZVN8CSCk4E'; 
+const POWER_AUTOMATE_URL = "https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/542b00c131884a3e8235161bb10bd625/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EMA0sCNKGWx86m-cXU5EyhZCq3lbbB-pSZVN8CSCk4E"; 
 
 export class SharePointService {
   private siteUrl: string;
@@ -377,9 +379,9 @@ export class SharePointService {
     }, 0);
     const nextNumber = String(maxNumber + 1).padStart(3, '0');
 
-    const staff = this.isLocal ? this.getFromLocal<StaffMember>('pact_staff') : await this.getStaffDirectory();
-    const person = staff.find(s => s.id === caseData.chargedPerson);
-    const policies = this.isLocal ? this.getFromLocal<PolicyOffence>('pact_policies') : await this.getPolicyLibrary();
+    const staff = this.isLocal ? (this.getFromLocal<StaffMember>('pact_staff').length > 0 ? this.getFromLocal<StaffMember>('pact_staff') : staffData) : await this.getStaffDirectory();
+    const person = staff.find((s: StaffMember) => s.id === caseData.chargedPerson);
+    const policies = await this.getPolicyLibrary();
     const policy = policies.find(p => p.id === caseData.offenceCategory);
 
     const newCase: ComplianceCase = {
@@ -389,8 +391,8 @@ export class SharePointService {
       chargedPersonName: person?.fullName || 'Unknown Staff',
       staffEmail: person?.email || 'staff@konstructum.com',
       department: person?.department || 'General',
-      offenceCategory: caseData.offenceCategory || 'Unknown',
-      offenceCategoryName: this.expandAbbreviations(policy?.offenceName || 'Unknown Offence'),
+      offenceCategory: caseData.offenceCategory || 'Unknown', // This is the ID
+      offenceCategoryName: this.expandAbbreviations(policy?.offenceName || 'Unknown Offence'), // This is the Name
       offenceDescription: caseData.offenceDescription || '',
       penaltyAmount: policy?.defaultPenaltyAmount || 0,
       dueDate: caseData.dueDate || new Date().toISOString(),
@@ -434,14 +436,34 @@ export class SharePointService {
         newTier = 'Tier 2';
       }
 
-      await this.createEscalation({
-        caseReference: newCase.title,
-        offender: newCase.chargedPerson,
-        offenderName: newCase.chargedPersonName,
-        escalationReason: reason,
-        previousTier: policy.tier,
-        newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
-      });
+      try {
+        await this.createEscalation({
+          caseReference: newCase.title,
+          offender: newCase.chargedPerson,
+          offenderName: newCase.chargedPersonName,
+          escalationReason: reason,
+          previousTier: policy.tier,
+          newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
+        });
+      } catch (escError) {
+        console.warn("Escalation creation failed (non-blocking):", escError);
+        // Fallback: save escalation locally
+        const log = this.getFromLocal<EscalationEntry>('pact_escalations');
+        log.push({
+          id: Date.now().toString(),
+          title: `Escalation ${newCase.title}`,
+          caseReference: newCase.title,
+          offender: newCase.chargedPerson,
+          offenderName: newCase.chargedPersonName,
+          escalationReason: reason,
+          previousTier: policy.tier,
+          newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3",
+          triggeredBy: 'System',
+          escalationDate: new Date().toISOString(),
+          notifiedTo: 'HR Manager'
+        });
+        this.saveToLocal('pact_escalations', log);
+      }
     }
 
     // 2. Update Tracker — increment the correct tier counter
@@ -466,94 +488,131 @@ export class SharePointService {
       })
     };
 
-    if (tracker) {
-      await this.updateRepeatTracker(newCase.chargedPerson, updatedTracker);
-    } else {
-      // Create a new tracker record if it doesn't exist
+    try {
+      if (tracker) {
+        await this.updateRepeatTracker(newCase.chargedPerson, updatedTracker);
+      } else {
+        // Create a new tracker record if it doesn't exist
+        const trackers = this.getFromLocal<any>('pact_trackers') || [];
+        trackers.push(updatedTracker);
+        this.saveToLocal('pact_trackers', trackers);
+      }
+    } catch (trackerError) {
+      console.warn("Tracker update failed (non-blocking):", trackerError);
+      // Fallback: always save locally
       const trackers = this.getFromLocal<any>('pact_trackers') || [];
-      trackers.push(updatedTracker);
+      const idx = trackers.findIndex((t: any) => t.offender === newCase.chargedPerson);
+      if (idx > -1) {
+        trackers[idx] = updatedTracker;
+      } else {
+        trackers.push(updatedTracker);
+      }
       this.saveToLocal('pact_trackers', trackers);
     }
 
-    // 3. Email Notifications
-    const offCount = (tracker?.tier1Last6Months || 0) + (policy?.tier === 'Tier 1' ? 1 : 0);
+    // 3. Email Notifications — compute offence count for ALL tiers
+    let offCount = 1;
+    if (tracker) {
+      if (policyTier === 'Tier 1') offCount = (tracker.tier1Last6Months || 0) + 1;
+      else if (policyTier === 'Tier 2') offCount = (tracker.tier2Offences || 0) + 1;
+      else if (policyTier === 'Tier 3') offCount = (tracker.tier3Offences || 0) + 1;
+    }
     const actionPath = isEscalated ? 'Automatic Escalation' : 
-                      (policy?.tier === 'Tier 1' ? (offCount === 1 ? '1st Offence' : offCount === 2 ? '2nd Offence' : '3rd+ Offence') : 'Standard');
+                      (offCount === 1 ? '1st Offence' : offCount === 2 ? '2nd Offence' : '3rd+ Offence');
     
     const disciplinaryAction = policy ? escalationEngine.getRecommendedAction(policy, offCount, isEscalated) : 'Standard Disciplinary Path';
-    // Handover to Power Automate: 
-    // We no longer build or send the email from the frontend. The Power Automate flow 
-    // triggers "When an item is created" in SharePoint and handles the 
-    // sequential notifications (Day 0, Day 3, Day 7).
+
+    // 3b. Resolve line manager from staff directory (lineManager stores an email address)
+    const manager = staff.find((member: StaffMember) => member.email === person?.lineManager);
+
+    // 4. Create Disciplinary Action Record (for all modes)
+    try {
+      await this.createDisciplinaryAction({
+        title: await this.getNextDisciplinaryReference(),
+        caseReference: newCase.title,
+        actionType: disciplinaryAction,
+        penaltyAmount: newCase.penaltyAmount,
+        notes: `Action Classification: ${actionPath}. Recommended by PACT Engine.`,
+        status: 'Pending'
+      });
+    } catch (daError) {
+      console.warn("Disciplinary action creation failed (non-blocking):", daError);
+      // Fallback: save locally so the record is not lost
+      const log = this.getFromLocal<any>('pact_disciplinary');
+      log.push({
+        id: Date.now().toString(),
+        title: this.formatDisciplinaryReference(log.length + 1),
+        caseReference: newCase.title,
+        actionType: disciplinaryAction,
+        actionDate: new Date().toISOString(),
+        actionedBy: this.getUserName(),
+        penaltyAmount: newCase.penaltyAmount,
+        notes: `Action Classification: ${actionPath}. Recommended by PACT Engine.`,
+        status: 'Pending'
+      });
+      this.saveToLocal('pact_disciplinary', log);
+    }
+
+    // 5. Send Email Notifications — Disabled as Power Automate handles all notifications
     /*
-    const emailSubject = `PACT ALERT: ${this.expandAbbreviations(policy?.offenceName || 'Compliance Incident')} - ${newCase.chargedPersonName} (Ref: ${newCase.title})`;
-    const emailBody = `...`;
-    const manager = staff.find(s => s.fullName === person?.lineManager);
-    const recipients = [newCase.staffEmail];
-    if (manager?.email) recipients.push(manager.email);
-    await this.sendEmailNotification(recipients, emailSubject, emailBody);
+    const offenceName = this.expandAbbreviations(policy?.offenceName || 'Compliance Incident');
+
+    // Staff email
+    if (newCase.staffEmail) {
+      const staffSubject = `PACT NOTICE: ${newCase.title} — ${offenceName}`;
+      // ... (body logic)
+      await this.sendEmailNotification([newCase.staffEmail], staffSubject, staffBody);
+    }
+
+    // Line manager email
+    if (manager?.email) {
+      const managerSubject = `PACT SUPERVISORY ALERT: ${newCase.title} — ${newCase.chargedPersonName}`;
+      // ... (body logic)
+      await this.sendEmailNotification([manager.email], managerSubject, managerBody);
+    }
     */
 
-    // 4. Persistence
-
-    // 4. Persistence & Power Automate Submission
+    // 6. Persistence & Power Automate Submission
     if (this.isLocal || POWER_AUTOMATE_URL) {
       // Local tracking for dashboard
       const cases = this.getFromLocal<ComplianceCase>('pact_cases');
       cases.push(newCase);
       this.saveToLocal('pact_cases', cases);
 
-      // Power Automate Submission
+      // Power Automate Submission — enriched payload
       if (POWER_AUTOMATE_URL) {
         try {
+          const payload = {
+            ...newCase,
+            offenceName: policy?.offenceName || newCase.offenceCategoryName, // Use the string name
+            tier: policyTier,
+            offenceCount: offCount,
+            actionLabel: actionPath,
+            disciplinaryAction: disciplinaryAction,
+            recommendedAction: disciplinaryAction,
+            firstOffenceAction: policy?.firstOffenceAction || '',
+            secondOffenceAction: policy?.secondOffenceAction || '',
+            thirdOffenceAction: policy?.thirdOffenceAction || '',
+            lineManagerEmail: manager?.email || '',
+            lineManagerName: manager?.fullName || '',
+            isEscalated: isEscalated,
+            penaltyAmount: newCase.penaltyAmount // Ensure number
+          };
+
           const response = await fetch(POWER_AUTOMATE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...newCase,
-              offenceName: policy?.offenceName || newCase.offenceCategoryName,
-              tier: policy?.tier || '',
-              firstOffenceAction: policy?.firstOffenceAction || '',
-              recommendedAction: disciplinaryAction
-            })
+            body: JSON.stringify(payload)
           });
-          if (!response.ok) throw new Error('Power Automate submission failed');
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Status ${response.status}: ${errText}`);
+          }
         } catch (error) {
           console.error("Power Automate Error:", error);
-          // We still return the case so the UI shows success locally, 
-          // but we log the error.
         }
       }
       return newCase;
-    }
-
-    // 5. Create Disciplinary Action Record
-    await this.createDisciplinaryAction({
-      title: await this.getNextDisciplinaryReference(),
-      caseReference: newCase.title,
-      actionType: disciplinaryAction,
-      penaltyAmount: newCase.penaltyAmount,
-      notes: `Action Classification: ${actionPath}. Recommended by PACT Engine.`,
-      status: 'Pending'
-    });
-
-    const manager = staff.find(member =>
-      member.fullName === person?.lineManager || member.email === person?.lineManager
-    );
-    const recipients = Array.from(new Set([
-      newCase.staffEmail,
-      manager?.email
-    ].filter(Boolean) as string[]));
-
-    if (recipients.length > 0) {
-      const subject = `PACT NOTICE: ${newCase.title} - ${newCase.offenceCategoryName}`;
-      const body = `
-        <p>An offence has been logged against <b>${newCase.chargedPersonName}</b>.</p>
-        <p><b>Offence:</b> ${newCase.offenceCategoryName}</p>
-        <p><b>Sanction:</b> ${disciplinaryAction}</p>
-        <p><b>Reference:</b> ${newCase.title}</p>
-      `;
-      await this.sendEmailNotification(recipients, subject, body);
     }
 
     return newCase;
