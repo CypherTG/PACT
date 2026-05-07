@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { NavLink, useHistory } from 'react-router-dom';
-import { ShieldAlert, ArrowLeft, Upload, AlertCircle, Loader2, Users, FileText } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import { escalationEngine } from '../../services/EscalationEngine';
 import type { StaffMember, PolicyOffence, RepeatOffenceRecord } from '../../config/types';
@@ -18,10 +18,8 @@ export const NewCaseForm: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [tier, setTier] = useState('');
-  const [disciplinaryAction, setDisciplinaryAction] = useState('');
-  const [secondaryEmail, setSecondaryEmail] = useState('');
   const [staffHistory, setStaffHistory] = useState<RepeatOffenceRecord | null>(null);
+  const [emailNotification, setEmailNotification] = useState<{to: string, subject: string} | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,49 +31,38 @@ export const NewCaseForm: React.FC = () => {
     ]).then(([staffData, policyData]) => {
       setStaff(staffData);
       setPolicies(policyData);
-    }).catch(() => undefined);
+    });
   }, []);
 
   useEffect(() => {
     if (personId) {
-      sharePointService.getRepeatTrackerRecord(personId).then(record => setStaffHistory(record ?? null)).catch(() => setStaffHistory(null));
+      sharePointService.getRepeatTrackerRecord(personId).then(setStaffHistory);
     } else {
       setStaffHistory(null);
     }
   }, [personId]);
 
-  const handleStaffChange = (id: string): void => {
-    setPersonId(id);
-    const selected = staff.find(s => s.id === id);
-    if (selected) {
-      setSecondaryEmail(selected.lineManager || '');
-    } else {
-      setSecondaryEmail('');
-    }
-  };
-
-  const handlePolicyChange = (id: string): void => {
-    setCategoryId(id);
-    const selected = policies.find(p => p.id === id);
-    if (selected) {
-      setTier(selected.tier || '');
-      setDisciplinaryAction((selected as any).firstOffenceAction || '');
-    } else {
-      setTier('');
-      setDisciplinaryAction('');
-    }
-  };
+  useEffect(() => {
+    const handleEmail = (e: any) => {
+      setEmailNotification({ 
+        to: e.detail.to.join(', '), 
+        subject: e.detail.subject 
+      });
+      setTimeout(() => setEmailNotification(null), 5000); // Clear after 5s
+    };
+    window.addEventListener('pact-mock-email', handleEmail);
+    return () => window.removeEventListener('pact-mock-email', handleEmail);
+  }, []);
 
   const selectedPolicy = useMemo(() => policies.find(p => p.id === categoryId), [policies, categoryId]);
   const selectedStaff = useMemo(() => staff.find(s => s.id === personId), [staff, personId]);
   
+  // Calculate dynamic action based on history
   const offenceCount = useMemo(() => {
     if (!selectedPolicy) return 1;
-    if (!staffHistory) return 1;
-    if (selectedPolicy.tier === 'Tier 1') return (staffHistory.tier1Last6Months || 0) + 1;
-    if (selectedPolicy.tier === 'Tier 2') return (staffHistory.tier2Offences || 0) + 1;
-    if (selectedPolicy.tier === 'Tier 3') return (staffHistory.tier3Offences || 0) + 1;
-    return 1;
+    return selectedPolicy.tier === 'Tier 1' 
+      ? (staffHistory?.tier1Last6Months || 0) + 1 
+      : 1;
   }, [selectedPolicy, staffHistory]);
   
   const isEscalated = useMemo(() => {
@@ -89,13 +76,11 @@ export const NewCaseForm: React.FC = () => {
   }, [selectedPolicy, offenceCount, isEscalated]);
 
   const actionLabel = useMemo(() => {
-    if (isEscalated) return "Automatic Escalation (Tier 2)";
+    if (isEscalated) return "Escalated Action";
     if (offenceCount === 1) return "1st Offence Path";
     if (offenceCount === 2) return "2nd Offence Path";
-    if (offenceCount === 3) return "3rd Offence Path";
-    return `Incident #${offenceCount}`;
+    return "3rd Offence Path";
   }, [isEscalated, offenceCount]);
-
   const riskColor = useMemo(() => {
     if (!staffHistory) return 'var(--text-secondary)';
     const level = escalationEngine.calculateRiskLevel(staffHistory);
@@ -104,12 +89,15 @@ export const NewCaseForm: React.FC = () => {
     return '#107c10';
   }, [staffHistory]);
 
-  const submitIncident = async (): Promise<void> => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!personId || !categoryId) {
       alert("Please select a staff member and an infraction.");
       return;
     }
-
+    
     setIsSubmitting(true);
     try {
       await sharePointService.createCase({
@@ -117,7 +105,7 @@ export const NewCaseForm: React.FC = () => {
         offenceCategory: categoryId,
         offenceDescription: description,
         dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
-        secondaryContact: secondaryEmail
+        evidence: selectedFile ? selectedFile.name : undefined
       });
       setIsSubmitting(false);
       setSuccess(true);
@@ -125,21 +113,16 @@ export const NewCaseForm: React.FC = () => {
     } catch (error) {
       console.error("Submission failed:", error);
       setIsSubmitting(false);
-      alert(`Critical System Failure: Unable to persist compliance record. Please ensure you are logged in or reset the PACT engine.\n\nTechnical Details: ${error instanceof Error ? error.message : 'Unknown exception'}`);
+      alert("Failed to log incident. Please check your connection or reset the engine.");
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent): void => {
-    e.preventDefault();
-    submitIncident().catch(() => undefined);
   };
 
   if (success) {
     return (
       <div className="glass-panel text-center" style={{ padding: '60px', maxWidth: '600px', margin: '40px auto' }}>
-        <h2 style={{ color: 'var(--status-success)' }}>✔ Incident Logged Successfully</h2>
-        <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-          <p style={{ fontWeight: 500 }}>The PACT engine has recorded this case and triggered formal notifications.</p>
+        <h2 style={{ color: 'var(--primary)' }}>✔ Incident Logged Successfully</h2>
+        <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(0,0,0,0.02)', borderRadius: '12px' }}>
+          <p>The PACT engine has recorded this case and triggered notifications.</p>
         </div>
         <p className="text-secondary" style={{ marginTop: '24px', fontSize: '0.85rem' }}>
           Redirecting to case directory...
@@ -149,215 +132,284 @@ export const NewCaseForm: React.FC = () => {
   }
 
   return (
-    <div className="cases-container" style={{ maxWidth: '900px', margin: '0 auto' }} data-testid="new-case-form">
-      <div className="cases-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="cases-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div className="cases-header" style={{ marginBottom: '16px' }}>
         <NavLink to="/cases" className="btn btn-secondary">
-          <ArrowLeft size={16} /> Case Directory
+          <ArrowLeft size={16} /> Back to Cases
         </NavLink>
-        <div style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
-           v5.0 — POLICY COMPLIANCE
-        </div>
       </div>
 
-      <div className="form-layout-vertical" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        
-        {/* Section 1: Staff Identity */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: 'var(--text-primary)' }}>
-             <Users size={18} style={{ color: 'var(--primary)' }} />
-             Staff Identity
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="form-group">
-              <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Target Employee</label>
-              <select 
-                value={personId}
-                onChange={e => handleStaffChange(e.target.value)}
-                required
-                className="form-input"
-                style={{ width: '100%', padding: '14px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', fontSize: '1rem' }}
-              >
-                <option value="">-- Select Employee to Charge --</option>
-                {staff.map(member => (
-                  <option key={member.id} value={member.id}>{member.fullName} — {member.department}</option>
-                ))}
-              </select>
-            </div>
-
-            {selectedStaff && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <div>
-                  <div className="text-secondary" style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Secondary Contact (CC)</div>
-                  <div style={{ padding: '8px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{secondaryEmail || 'Not Assigned'}</div>
-                </div>
-                <div>
-                  <div className="text-secondary" style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Employee Email</div>
-                  <div style={{ padding: '8px 0', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedStaff.email}</div>
-                </div>
-              </div>
-            )}
+      <div className="glass-panel" style={{ padding: '32px' }} data-testid="new-case-form">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+          <div className="kpi-icon primary" style={{ width: '48px', height: '48px' }}>
+            <ShieldAlert size={20} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0 }}>Log Compliance Incident</h2>
+            <p className="text-secondary" style={{ margin: '4px 0 0', fontSize: '0.9rem' }}>
+              Create a new case using the <b>Policy Matrix</b>. Notifications are sent automatically.
+            </p>
           </div>
         </div>
 
-        {/* Section 2: Policy Matrix */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: 'var(--text-primary)' }}>
-             <ShieldAlert size={18} style={{ color: 'var(--status-warning)' }} />
-             Policy Matrix Enforcement
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="form-group">
-              <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Select Infraction</label>
-              <select 
-                value={categoryId}
-                onChange={e => handlePolicyChange(e.target.value)}
-                required
-                className="form-input"
-                style={{ width: '100%', padding: '14px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', fontSize: '1rem' }}
-              >
-                <option value="">-- Select Categorized Offence --</option>
-                {policies.map(policy => (
-                  <option key={policy.id} value={policy.id}>{policy.offenceName} ({policy.tier})</option>
-                ))}
-              </select>
-            </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} data-testid="new-case-submit-form">
+          
+          <div className="form-group">
+            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Offender</label>
+            <select 
+              value={personId}
+              onChange={e => setPersonId(e.target.value)}
+              required
+              className="form-input"
+              data-testid="case-offender-select"
+              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+            >
+              <option value="">-- Select Offender --</option>
+              {staff.map(member => (
+                <option key={member.id} value={member.id}>{member.fullName} ({member.department})</option>
+              ))}
+            </select>
+          </div>
 
-            {selectedPolicy && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                  <div style={{ padding: '16px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                    <div className="text-secondary" style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Classification</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: tier.includes('3') ? 'var(--status-danger)' : 'var(--text-primary)', marginTop: '4px' }}>
-                       {tier}
-                    </div>
-                  </div>
-                  <div style={{ padding: '16px', background: 'rgba(0,120,212,0.1)', borderRadius: '8px', border: '1px solid rgba(0,120,212,0.2)' }}>
-                    <div className="text-secondary" style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Recommended Sanction</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
-                       {recommendedAction || disciplinaryAction || (tier.includes('3') ? 'Suspension / Termination' : 'Pending Calculation')}
-                    </div>
+          {selectedStaff && (
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', animation: 'fadeIn 0.2s ease' }}>
+              <div>
+                <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Department</div>
+                <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedStaff.department}</div>
+              </div>
+              <div>
+                <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Reporting To</div>
+                <div style={{ color: 'var(--secondary)', fontWeight: 600 }}>{selectedStaff.lineManager || 'Not Assigned'}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Infraction (Policy Engine)</label>
+            <select 
+              value={categoryId}
+              onChange={e => setCategoryId(e.target.value)}
+              required
+              className="form-input"
+              data-testid="case-policy-select"
+              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+            >
+              <option value="">-- Select Infraction --</option>
+              {policies.map(policy => (
+                <option key={policy.id} value={policy.id}>{policy.offenceName} ({policy.tier})</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedPolicy && (
+            <div style={{ padding: '16px', background: 'rgba(0,120,212,0.05)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: '8px', animation: 'fadeIn 0.3s ease' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Disciplinary Action</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
+                    {recommendedAction || 'Calculating...'}
                   </div>
                 </div>
-
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span className="text-secondary" style={{ fontSize: '0.75rem', fontWeight: 600 }}>GOVERNANCE PATH</span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isEscalated ? 'var(--status-danger)' : 'var(--status-success)' }}>
-                      {actionLabel}
-                    </span>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Classification</div>
+                  <span className={`status-badge status-${selectedPolicy.tier.toLowerCase().replace(' ', '')}`}>{selectedPolicy.tier}</span>
+                </div>
+              </div>
+              
+              <div style={{ background: 'rgba(0,0,0,0.05)', padding: '12px', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Incident Context</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: riskColor }}>
+                    Risk: {staffHistory ? escalationEngine.calculateRiskLevel(staffHistory) : 'Low'}
                   </div>
-                  <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', color: 'var(--text-primary)', opacity: 0.8 }}>
-                    <span>Rolling T1 Count: <strong>{staffHistory?.tier1Last6Months || 0}</strong></span>
-                    <span>Lifetime T2: <strong>{staffHistory?.tier2Offences || 0}</strong></span>
-                    <span>Risk Level: <strong style={{ color: riskColor }}>{staffHistory ? escalationEngine.calculateRiskLevel(staffHistory) : 'Low'}</strong></span>
+                </div>
+                
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', opacity: 0.8 }}>
+                    <span title="Tier 1 offences in last 6 months">T1: <b>{staffHistory?.tier1Last6Months || 0}</b></span>
+                    <span title="Total Tier 2 offences">T2: <b>{staffHistory?.tier2Offences || 0}</b></span>
+                    <span>Status: <b>{actionLabel}</b></span>
                   </div>
                   {isEscalated && (
-                    <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(209, 52, 56, 0.1)', borderLeft: '3px solid var(--status-danger)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--status-danger)', fontWeight: 600 }}>
-                       POLICY ALERT: This incident has been automatically upgraded to Tier 2 based on repeat-offence thresholds.
+                    <div style={{ color: '#d13438', fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <AlertCircle size={14} /> Automatic Policy Escalation Triggered
                     </div>
                   )}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section 3: Narrative */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: 'var(--text-primary)' }}>
-             <FileText size={18} style={{ color: 'var(--secondary)' }} />
-             Incident Narrative
-          </h3>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="form-group">
-              <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Description of Breach</label>
-              <textarea 
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                required
-                rows={4}
-                placeholder="Provide objective details of the infraction, including location, time, and specific policy violated..."
-                style={{ width: '100%', padding: '14px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical' }}
-              />
             </div>
+          )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Incident Date</label>
-                <input 
-                  type="date"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '14px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
-                />
+          <div className="form-group">
+            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Infraction Description</label>
+            <textarea 
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              required
+              rows={4}
+              placeholder="Describe the specific details of the compliance breach..."
+              data-testid="case-description"
+              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Date</label>
+            <input 
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              required
+              data-testid="case-due-date"
+              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Evidence Attachment</label>
+            <input 
+              type="file" 
+              id="pact-new-case-upload" 
+              style={{ display: 'none' }} 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setSelectedFile(file);
+              }}
+            />
+            <div 
+              onClick={() => document.getElementById('pact-new-case-upload')?.click()}
+              style={{ 
+                border: '2px dashed var(--border-light)', 
+                borderRadius: '8px', 
+                padding: '32px', 
+                textAlign: 'center',
+                background: 'rgba(0,0,0,0.02)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-light)'}
+            >
+              <Upload size={24} className="text-secondary" style={{ margin: '0 auto 12px' }} />
+              <div style={{ color: selectedFile ? 'var(--status-success)' : 'inherit', fontWeight: selectedFile ? 600 : 400 }}>
+                {selectedFile ? `✓ ${selectedFile.name}` : 'Click or drag file to upload'}
               </div>
-              <div className="form-group">
-                <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Evidence Attachment</label>
-                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px dashed var(--border-light)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  <Upload size={16} /> Click to Upload Files
+              <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>PNG, JPG, PDF up to 10MB</div>
+            </div>
+          </div>
+
+          <div style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', marginTop: '8px' }}>
+            <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '8px' }}>Notification Preview</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldAlert size={14} style={{ color: 'var(--status-success)' }} />
+                <span>To Offender: <code style={{ color: 'var(--primary)' }}>{selectedStaff?.email || '...'}</code></span>
+              </div>
+              {selectedStaff?.lineManager && (() => {
+                const manager = staff.find(s => s.email === selectedStaff.lineManager);
+                return (
+                <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldAlert size={14} style={{ color: 'var(--secondary)' }} />
+                  <span>CC Supervisor: <strong>{manager?.fullName || 'Unknown'}</strong> — <code style={{ color: 'var(--secondary)' }}>{manager?.email || selectedStaff.lineManager}</code></span>
+                </div>
+                );
+              })()}
+
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '16px', paddingTop: '24px', borderTop: '1px solid var(--border-light)' }}>
+            <NavLink to="/cases" className="btn btn-secondary">Cancel</NavLink>
+            <button 
+              type="button" 
+              className="btn btn-secondary"
+              onClick={() => setShowPreview(true)}
+              disabled={!personId || !categoryId || isSubmitting}
+              data-testid="case-preview-button"
+            >
+              Preview Mail
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting} data-testid="case-submit-button" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '160px', justifyContent: 'center' }}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Processing...
+                </>
+              ) : 'Submit Incident'}
+            </button>
+          </div>
+
+          {showPreview && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+              <div className="glass-panel" style={{ maxWidth: '650px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '0', border: '1px solid #444', background: 'var(--bg-panel)' }}>
+                <div style={{ padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0 }}>Notification Preview</h3>
+                  <button type="button" onClick={() => setShowPreview(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem' }}>&times;</button>
+                </div>
+                <div style={{ padding: '30px', background: 'white', color: '#333' }}>
+                  <div style={{ marginBottom: '20px', fontSize: '0.9rem', color: '#666', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    <b>Subject:</b> PACT ALERT: {selectedPolicy?.offenceName} - {selectedStaff?.fullName}
+                  </div>
+                  <div style={{ fontFamily: 'Arial, sans-serif' }}>
+                    <h2 style={{ color: '#0078d4', marginTop: 0 }}>PACT Compliance Notification</h2>
+                    <p>Formal record for <b>{selectedStaff?.fullName}</b>.</p>
+                    <div style={{ background: '#f3f2f1', padding: '15px', borderRadius: '4px', margin: '20px 0' }}>
+                      <table style={{ width: '100%', fontSize: '14px' }}>
+                        <tr><td style={{ color: '#666', width: '100px' }}>Offence:</td><td>{selectedPolicy?.offenceName}</td></tr>
+                        <tr><td style={{ color: '#666', padding: '10px 0' }}>Description:</td><td style={{ padding: '10px 0' }}>{description || '[No description provided]'}</td></tr>
+                        <tr><td style={{ color: '#666' }}>Classification:</td><td><b>{actionLabel}</b></td></tr>
+                      </table>
+                    </div>
+                    <div style={{ borderLeft: '4px solid #0078d4', paddingLeft: '15px', marginTop: '20px' }}>
+                      <h3 style={{ margin: 0, fontSize: '16px', color: '#0078d4' }}>Disciplinary Action</h3>
+                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>{recommendedAction}</p>
+                    </div>
+
+                    {/* ACTION BUTTONS (Added as requested) */}
+                    <div style={{ display: 'flex', gap: '15px', marginTop: '30px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+                      <div style={{ background: '#0078d4', color: 'white', padding: '12px 24px', borderRadius: '4px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        Accept & Pay Fine
+                      </div>
+                      <div style={{ background: 'white', color: '#666', padding: '12px 24px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        Appeal Decision
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#999', marginTop: '20px' }}>
+                      This is an automated governance record. You must respond within 7 days.
+                    </p>
+                  </div>
+                </div>
+                <div style={{ padding: '20px', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end', background: 'rgba(255,255,255,0.05)' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowPreview(false)} data-testid="case-preview-close">Close Preview</button>
+                  <button type="button" className="btn btn-primary" onClick={(e) => { setShowPreview(false); handleSubmit(e as any); }} data-testid="case-preview-confirm">Confirm & Log Now</button>
                 </div>
               </div>
             </div>
+          )}
+        </form>
 
-            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
-              <button 
-                type="button" 
-                className="btn btn-secondary"
-                onClick={() => setShowPreview(true)}
-                disabled={!personId || !categoryId || isSubmitting}
-              >
-                Preview Notice
-              </button>
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                disabled={isSubmitting} 
-                style={{ minWidth: '200px', height: '48px' }}
-              >
-                {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Log Compliance Case'}
-              </button>
-            </div>
-          </form>
-        </div>
+        {/* Email Mock Toast */}
+        {emailNotification && (
+          <div style={{ 
+            position: 'fixed', 
+            bottom: '24px', 
+            right: '24px', 
+            background: 'var(--primary)', 
+            color: 'white', 
+            padding: '16px 24px', 
+            borderRadius: '12px', 
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            animation: 'slideInRight 0.3s ease',
+            zIndex: 1000
+          }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>📬 Mock Email Sent (Local Mode)</div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>To: {emailNotification.to}</div>
+          </div>
+        )}
       </div>
-
-      {showPreview && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-panel" style={{ maxWidth: '650px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '0', border: '1px solid #444' }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Notification Preview</h3>
-              <button type="button" onClick={() => setShowPreview(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem' }}>&times;</button>
-            </div>
-            <div style={{ padding: '30px', background: 'white', color: '#333' }}>
-              <div style={{ marginBottom: '20px', fontSize: '0.9rem', color: '#666', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <b>Subject:</b> PACT ALERT: {selectedPolicy?.offenceName} - {selectedStaff?.fullName}
-              </div>
-              <div style={{ fontFamily: 'Arial, sans-serif' }}>
-                <h2 style={{ color: '#0078d4', marginTop: 0 }}>PACT Compliance Notification</h2>
-                <p>Formal record for <b>{selectedStaff?.fullName}</b>.</p>
-                <div style={{ background: '#f3f2f1', padding: '15px', borderRadius: '4px', margin: '20px 0' }}>
-                  <table style={{ width: '100%', fontSize: '14px' }}>
-                    <tbody>
-                      <tr><td style={{ color: '#666', width: '100px' }}>Offence:</td><td>{selectedPolicy?.offenceName}</td></tr>
-                      <tr><td style={{ color: '#666', padding: '10px 0' }}>Description:</td><td style={{ padding: '10px 0' }}>{description || '[No description provided]'}</td></tr>
-                      <tr><td style={{ color: '#666' }}>Classification:</td><td><b>{actionLabel}</b></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div style={{ borderLeft: '4px solid #0078d4', paddingLeft: '15px', marginTop: '20px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', color: '#0078d4' }}>Disciplinary Action</h3>
-                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>{recommendedAction}</p>
-                </div>
-              </div>
-            </div>
-            <div style={{ padding: '20px', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end', background: 'rgba(255,255,255,0.05)' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowPreview(false)}>Close</button>
-              <button type="button" className="btn btn-primary" onClick={() => { setShowPreview(false); submitIncident().catch(() => undefined); }}>Confirm & Log</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

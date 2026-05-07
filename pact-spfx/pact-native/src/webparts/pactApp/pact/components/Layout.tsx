@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useHistory } from 'react-router-dom';
 import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, FileSearch, ShieldAlert, Mail } from 'lucide-react';
+// import './Layout.css';
 import { sharePointService } from '../services/SharePointService';
 import { WorkbenchBridge } from './Runtime/WorkbenchBridge';
 
@@ -13,53 +14,27 @@ const navigation = [
   { name: 'Compliance Cases', href: '/cases', icon: ShieldAlert },
   { name: 'Staff Directory', href: '/staff', icon: Users },
   { name: 'Escalation Log', href: '/escalations', icon: AlertTriangle },
-  { name: 'Appeals', href: '/appeals', icon: FileSearch },
   { name: 'Policy Library', href: '/policies', icon: FileText },
   { name: 'Communication Log', href: '/admin/mail-log', icon: Mail },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-export const Layout = ({ children }: LayoutProps): React.ReactElement => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const history = useHistory();
-  const [session, setSession] = React.useState(() => sharePointService.getCurrentSession());
-  
+  const [session, setSession] = React.useState(sharePointService.getCurrentSession());
+
   React.useEffect(() => {
-    if (sharePointService) {
-      sharePointService.initialize().then(() => {
-        setSession(sharePointService.getCurrentSession());
-      }).catch(() => {
-        setSession(sharePointService.getCurrentSession());
-      });
-    }
+    sharePointService.initialize();
+    // Refresh session after initialization
+    setSession(sharePointService.getCurrentSession());
   }, []);
 
-  const username = session.displayName || "User";
-  const userEmail = session.email || "No email available";
-  const tenantLabel = session.tenantName || session.siteTitle || 'SharePoint';
-  const runtimeLabel = sharePointService.getRuntimeLabel();
   const runtimeStyles = sharePointService.isStandalone()
     ? { borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--status-warning)', background: 'rgba(245, 158, 11, 0.12)' }
     : { borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--status-success)', background: 'rgba(16, 185, 129, 0.12)' };
-  const handlePhotoError = (event: React.SyntheticEvent<HTMLImageElement>): void => {
-    event.currentTarget.style.display = 'none';
-    const fallback = event.currentTarget.parentElement?.querySelector('.avatar-fallback, .badge-avatar-fallback') as HTMLElement | null;
-    if (fallback) {
-      fallback.style.display = 'flex';
-    }
-  };
-
-  const location = history.location.pathname;
-  const getPageTitle = (): string => {
-    if (location === '/') return 'Executive Overview';
-    if (location.startsWith('/cases')) return 'Compliance Cases';
-    if (location.startsWith('/staff')) return 'Staff Directory';
-    if (location.startsWith('/escalations')) return 'Escalation Log';
-    if (location.startsWith('/appeals')) return 'Appeals Management';
-    if (location.startsWith('/policies')) return 'Policy Library';
-    if (location.startsWith('/admin')) return 'System Administration';
-    if (location.startsWith('/settings')) return 'System Settings';
-    return 'Governance Platform';
-  };
+  const runtimeConnectionLabel = sharePointService.isStandalone()
+    ? 'Workbench Demo'
+    : 'SharePoint Native';
 
   return (
     <div className="app-layout" data-testid="pact-app-shell">
@@ -67,29 +42,37 @@ export const Layout = ({ children }: LayoutProps): React.ReactElement => {
       <aside className="sidebar glass-panel">
         <div className="sidebar-header">
           <div className="logo-container">
-            <img 
-              src={require('../assets/kcc-logo.png')} 
-              alt="KCC" 
-              className="logo-img" 
-              style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'contain' }} 
-              onError={(e) => { 
-                (e.target as HTMLImageElement).style.display = 'none'; 
-                const el = document.getElementById('logo-fallback'); 
-                if (el) el.style.display = 'flex'; 
-              }} 
-            />
-            <div id="logo-fallback" className="logo-icon" style={{ display: 'none' }}>P</div>
+            <div className="logo-icon" style={{ overflow: 'hidden', background: 'transparent', boxShadow: 'none', border: 'none' }}>
+              <img 
+                src={require('../assets/kcc-logo.png')} 
+                alt="KCC" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  const parent = (e.target as HTMLImageElement).parentElement;
+                  if (parent) {
+                    parent.innerText = 'P';
+                    parent.style.background = 'linear-gradient(135deg, var(--primary), #ff6b35)';
+                    parent.style.display = 'flex';
+                    parent.style.alignItems = 'center';
+                    parent.style.justifyContent = 'center';
+                    parent.style.color = 'white';
+                    parent.style.fontWeight = 'bold';
+                  }
+                }}
+              />
+            </div>
             <h1 className="logo-text">PACT</h1>
           </div>
         </div>
-        
+
         <nav className="sidebar-nav scroll-container">
           <ul>
             {navigation.map((item) => (
               <li key={item.name}>
-                <NavLink 
+                <NavLink
                   exact={item.href === '/'}
-                  to={item.href} 
+                  to={item.href}
                   className="nav-link"
                   activeClassName="active"
                   data-testid={`nav-${item.href.replace(/[^\w]/g, '').toLowerCase() || 'home'}`}
@@ -103,27 +86,22 @@ export const Layout = ({ children }: LayoutProps): React.ReactElement => {
         </nav>
 
         <div className="sidebar-footer">
-            <div className="user-profile">
-              <div className="avatar avatar-photo">
-                <img
-                  src={session.photoUrl}
-                  alt={username}
-                  onError={handlePhotoError}
-                  onLoad={(event) => {
-                    event.currentTarget.style.display = 'block';
-                  }}
-                />
-                <span className="avatar-fallback">{username.charAt(0) || 'U'}</span>
-              </div>
-              <div className="user-info">
-                <span className="user-name">{username}</span>
-                <span className="user-email">{userEmail}</span>
-                <span className="user-role" style={{ color: 'var(--status-success)', display: 'flex', alignItems: 'center' }}>
-                  <span className="status-dot"></span>
-                  {tenantLabel}
-                </span>
-              </div>
+          <div className="user-profile">
+            <div className="avatar">
+              {session.photoUrl ? (
+                <img src={session.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                session.displayName.charAt(0)
+              )}
             </div>
+            <div className="user-info">
+              <span className="user-name">{session.displayName}</span>
+              <span className="user-role" style={{ color: runtimeStyles.color, display: 'flex', alignItems: 'center' }}>
+                <span className="status-dot"></span>
+                {runtimeConnectionLabel}
+              </span>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -132,31 +110,24 @@ export const Layout = ({ children }: LayoutProps): React.ReactElement => {
         <header className="top-header glass-panel">
           <div className="header-left">
             <h2 className="page-title">
-              {getPageTitle()}
-              <span style={{ fontSize: '10px', opacity: 0.3, marginLeft: '10px', fontWeight: 'normal' }}>v5.0-OPTIMIZED</span>
+              Executive Overview
+              <span style={{ fontSize: '10px', opacity: 0.3, marginLeft: '10px', fontWeight: 'normal' }}>v5.0-NATIVE</span>
             </h2>
-            <div className="header-subtitle">
-              {tenantLabel} — Governance Dashboard
-            </div>
           </div>
 
-          
           <div className="header-actions">
+
             <div className="header-user-badge">
-              <div className="badge-avatar badge-photo">
-                <img
-                  src={session.photoUrl}
-                  alt={username}
-                  onError={handlePhotoError}
-                  onLoad={(event) => {
-                    event.currentTarget.style.display = 'block';
-                  }}
-                />
-                <span className="badge-avatar-fallback">{username.charAt(0) || 'U'}</span>
+              <div className="badge-avatar">
+                {session.photoUrl ? (
+                  <img src={session.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  session.displayName.charAt(0)
+                )}
               </div>
-              <div className="header-user-meta">
-                <span className="badge-name">{username}</span>
-                <span className="badge-email">{userEmail}</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="badge-name">{session.displayName}</span>
+                <span className="badge-email" style={{ fontSize: '10px', opacity: 0.6 }}>{session.email}</span>
               </div>
             </div>
 

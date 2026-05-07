@@ -7,4 +7,5 @@ export interface IPactAppProps {
   hasTeamsContext: boolean;
   userDisplayName: string;
   context: WebPartContext;
+  viewMode: 'Admin' | 'PublicReport';
 }

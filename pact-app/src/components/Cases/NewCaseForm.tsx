@@ -264,15 +264,31 @@ export const NewCaseForm: React.FC = () => {
 
           <div className="form-group">
             <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Evidence Attachment</label>
+            <input 
+              type="file" 
+              id="file-upload" 
+              style={{ display: 'none' }} 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  alert(`File selected: ${file.name}`);
+                  // In a real app, we would process/upload the file here
+                }
+              }}
+            />
             <div 
+              onClick={() => document.getElementById('file-upload')?.click()}
               style={{ 
                 border: '2px dashed var(--border-light)', 
                 borderRadius: '8px', 
                 padding: '32px', 
                 textAlign: 'center',
                 background: 'rgba(0,0,0,0.02)',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
               }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-light)'}
             >
               <Upload size={24} className="text-secondary" style={{ margin: '0 auto 12px' }} />
               <div style={{color: 'var(--text-primary)'}}>Click or drag file to upload</div>

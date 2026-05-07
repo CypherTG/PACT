@@ -47,6 +47,7 @@ export const PolicyLibrary: React.FC = () => {
                 <th>Auto-Escalate?</th>
                 <th>1st Offence Action</th>
                 <th>2nd Offence Action</th>
+                <th>3rd Offence Action</th>
               </tr>
             </thead>
             <tbody>
@@ -67,6 +68,7 @@ export const PolicyLibrary: React.FC = () => {
                   </td>
                   <td className="text-secondary">{p.firstOffenceAction}</td>
                   <td className="text-secondary">{p.secondOffenceAction}</td>
+                  <td className="text-secondary">{p.thirdOffenceAction}</td>
                 </tr>
               ))}
               {filteredPolicies.length === 0 && (

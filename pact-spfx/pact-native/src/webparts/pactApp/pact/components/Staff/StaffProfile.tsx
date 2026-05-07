@@ -84,13 +84,18 @@ export const StaffProfile: React.FC = () => {
           <div className="glass-panel" style={{padding: '2rem', textAlign: 'center'}}>
             <div style={{
               width: '100px', height: '100px',
-              background: 'linear-gradient(135deg, var(--primary), #d2334e)',
+              background: member.photoUrl ? 'none' : 'linear-gradient(135deg, var(--primary), #d2334e)',
               borderRadius: '50%', margin: '0 auto 1.5rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '2.5rem', fontWeight: 600, color: 'white',
-              boxShadow: '0 8px 16px rgba(220, 38, 38, 0.2)'
+              boxShadow: '0 8px 16px rgba(220, 38, 38, 0.2)',
+              overflow: 'hidden'
             }}>
-              {member.fullName.charAt(0)}
+              {member.photoUrl ? (
+                <img src={member.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                member.fullName.charAt(0)
+              )}
             </div>
             <h2 style={{margin: 0}}>{member.fullName}</h2>
             <p className="text-secondary" style={{marginTop: '0.5rem'}}>{member.role}</p>

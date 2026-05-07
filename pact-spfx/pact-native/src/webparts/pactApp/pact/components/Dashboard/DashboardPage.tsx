@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { 
   Users, 
@@ -12,57 +11,50 @@ import {
   BarChart, Bar, Legend
 } from 'recharts';
 import { sharePointService } from '../../services/SharePointService';
-import type { DashboardStats, MailLogEntry } from '../../config/types';
-import { Mail, CheckCircle, Clock, RefreshCw } from 'lucide-react';
-import { useSharePointCollection } from '../../hooks/useSharePointCollection';
+import type { DashboardStats } from '../../config/types';
+import { Mail, CheckCircle, Clock } from 'lucide-react';
+// import './Dashboard.css';
 
-export const DashboardPage = (): React.ReactElement => {
+export const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [backendState, setBackendState] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [backendDetail, setBackendDetail] = useState<string>('Checking SharePoint list connectivity...');
-  const { data: mailLogs, refresh: refreshMailLogs } = useSharePointCollection<MailLogEntry>(() => sharePointService.getMailHistory());
+  const [mailLogs, setMailLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    const checkBackend = async (): Promise<void> => {
-      try {
-        const [staff, policies, cases] = await Promise.all([
-          sharePointService.getStaffDirectory(),
-          sharePointService.getPolicyLibrary(),
-          sharePointService.getCases(),
-        ]);
-        setBackendState('online');
-        setBackendDetail(`Live SharePoint reads succeeded: ${staff.length} staff, ${policies.length} policies, ${cases.length} cases.`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown SharePoint read failure';
-        setBackendState('offline');
-        setBackendDetail(`SharePoint read failed: ${message}`);
+    sharePointService.getDashboardStats().then(data => {
+      setStats(data);
+      setLoading(false);
+    });
+
+    sharePointService.getMailHistory().then(history => {
+      if (Array.isArray(history)) {
+        setMailLogs(history.slice(0, 5));
       }
+    });
+
+    const handleMailEvent = (e: any) => {
+      if (!e.detail || !e.detail.to) return;
+      const recipientStr = Array.isArray(e.detail.to) ? e.detail.to.join(', ') : String(e.detail.to);
+      
+      setMailLogs(prev => [
+        { id: Date.now(), to: recipientStr, subject: e.detail.subject || 'No Subject', time: new Date().toLocaleTimeString() },
+        ...prev
+      ].slice(0, 5));
     };
 
-    const loadDashboard = async (): Promise<void> => {
-      try {
-        const data = await sharePointService.getDashboardStats();
-        setStats(data);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkBackend().catch(() => undefined);
-    loadDashboard().catch(() => undefined);
-    refreshMailLogs().catch(() => undefined);
+    window.addEventListener('pact-mock-email', handleMailEvent);
+    return () => window.removeEventListener('pact-mock-email', handleMailEvent);
   }, []);
 
   if (loading || !stats) {
     return (
       <div className="dashboard-container">
         <div className="kpi-grid">
-          {[1,2,3,4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{height: '100px'}} />)}
+          {[1,2,3,4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{height: '100px'}}></div>)}
         </div>
         <div className="dashboard-charts-grid" style={{marginTop: '2rem'}}>
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}} />
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}} />
+          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
+          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
         </div>
       </div>
     );
@@ -70,60 +62,6 @@ export const DashboardPage = (): React.ReactElement => {
 
   return (
     <div className="dashboard-container fade-in" data-testid="dashboard-page">
-      <div
-        className="glass-panel"
-        style={{
-          marginBottom: '1rem',
-          padding: '14px 18px',
-          borderLeft: backendState === 'online' ? '4px solid #10b981' : backendState === 'offline' ? '4px solid #ef4444' : '4px solid #f59e0b',
-          background: backendState === 'online'
-            ? 'rgba(16, 185, 129, 0.06)'
-            : backendState === 'offline'
-              ? 'rgba(239, 68, 68, 0.06)'
-              : 'rgba(245, 158, 11, 0.06)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap'
-        }}
-      >
-        <div>
-          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.7, letterSpacing: '0.08em' }}>
-            SharePoint Backend Status
-          </div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-            {backendState === 'online' ? 'Online' : backendState === 'offline' ? 'Offline' : 'Checking'}
-          </div>
-          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            {backendDetail}
-          </div>
-        </div>
-        <button className="btn btn-secondary" onClick={() => {
-          setBackendState('checking');
-          setBackendDetail('Rechecking SharePoint list connectivity...');
-          Promise.all([
-            sharePointService.getStaffDirectory(),
-            sharePointService.getPolicyLibrary(),
-            sharePointService.getCases(),
-          ]).then(([staff, policies, cases]) => {
-            setBackendState('online');
-            setBackendDetail(`Live SharePoint reads succeeded: ${staff.length} staff, ${policies.length} policies, ${cases.length} cases.`);
-          }).catch((error: unknown) => {
-            const message = error instanceof Error ? error.message : 'Unknown SharePoint read failure';
-            setBackendState('offline');
-            setBackendDetail(`SharePoint read failed: ${message}`);
-          });
-        }} data-testid="dashboard-backend-refresh">
-          Refresh Backend Check
-        </button>
-      </div>
-
-      <div className="cases-header" style={{ justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button className="btn btn-secondary" onClick={() => refreshMailLogs().catch(() => undefined)} data-testid="dashboard-mail-refresh">
-          <RefreshCw size={16} /> Refresh Mail Queue
-        </button>
-      </div>
       {/* Top KPI Summary Cards */}
       <div className="kpi-grid">
         <div className="kpi-card glass-panel">
@@ -143,10 +81,10 @@ export const DashboardPage = (): React.ReactElement => {
         </div>
 
         <div className="kpi-card glass-panel">
-          <div className="kpi-icon primary"><FileSearch size={24} /></div>
+          <div className="kpi-icon primary"><TrendingUp size={24} /></div>
           <div className="kpi-content">
-            <span className="kpi-label">Pending Appeals</span>
-            <span className="kpi-value">{stats.pendingAppeals}</span>
+            <span className="kpi-label">Financial Recovery</span>
+            <span className="kpi-value">₦{stats.totalFines.toLocaleString()}</span>
           </div>
         </div>
 
@@ -220,8 +158,8 @@ export const DashboardPage = (): React.ReactElement => {
           </div>
           <div className="activity-list">
             {stats.recentActivity.map(activity => (
-                <div key={activity.id} className="activity-item">
-                <div className={`activity-indicator severity-${activity.severity}`} />
+              <div key={activity.id} className="activity-item">
+                <div className={`activity-indicator severity-${activity.severity}`}></div>
                 <div className="activity-content">
                   <div className="activity-title">{activity.title}</div>
                   <div className="activity-desc">{activity.description}</div>
@@ -248,49 +186,14 @@ export const DashboardPage = (): React.ReactElement => {
               </div>
             ) : (
               mailLogs.map(log => (
-                <div
-                  key={log.id}
-                  className="activity-item"
-                  style={{
-                    borderLeft: log.status === 'Failed'
-                      ? '3px solid #b91c1c'
-                      : log.status === 'Processing'
-                        ? '3px solid #2563eb'
-                        : log.status === 'Pending'
-                          ? '3px solid #b45309'
-                          : '3px solid var(--status-success)',
-                    background: 'rgba(16, 185, 129, 0.03)'
-                  }}
-                >
+                <div key={log.id} className="activity-item" style={{ borderLeft: '3px solid var(--status-success)', background: 'rgba(16, 185, 129, 0.03)' }}>
                   <div className="activity-content">
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <div className="activity-title" style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{log.subject}</div>
-                      {log.status === 'Sent' ? (
-                        <CheckCircle size={14} color="var(--status-success)" />
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            padding: '2px 6px',
-                            borderRadius: '999px',
-                            background: log.status === 'Failed'
-                              ? 'rgba(220, 38, 38, 0.12)'
-                              : log.status === 'Processing'
-                                ? 'rgba(59, 130, 246, 0.12)'
-                                : 'rgba(245, 158, 11, 0.12)',
-                            color: log.status === 'Failed'
-                              ? '#b91c1c'
-                              : log.status === 'Processing'
-                                ? '#2563eb'
-                                : '#b45309'
-                          }}
-                        >
-                          {log.status}
-                        </span>
-                      )}
+                      <CheckCircle size={14} color="var(--status-success)" />
                     </div>
-                    <div className="activity-desc" style={{ fontSize: '0.75rem' }}>To: {log.to.join(', ')}</div>
-                    <div className="activity-time">{new Date(log.timestamp).toLocaleString()}</div>
+                    <div className="activity-desc" style={{ fontSize: '0.75rem' }}>To: {log.to}</div>
+                    <div className="activity-time">{log.time}</div>
                   </div>
                 </div>
               ))

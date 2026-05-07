@@ -3,7 +3,8 @@ import * as ReactDom from 'react-dom';
 import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
-  PropertyPaneTextField
+  PropertyPaneTextField,
+  PropertyPaneChoiceGroup
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -14,6 +15,7 @@ import { IPactAppProps } from './components/IPactAppProps';
 
 export interface IPactAppWebPartProps {
   description: string;
+  viewMode: 'Admin' | 'PublicReport';
 }
 
 export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPartProps> {
@@ -23,45 +25,23 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
   private _workbenchHost: HTMLDivElement | null = null;
 
   public render(): void {
-    let isWorkbench = false;
-    try {
-      isWorkbench = typeof window !== 'undefined' && /workbench/i.test(window.location.href);
-    } catch {
-      isWorkbench = false;
+    // Inject CSS to force SharePoint Workbench and Canvas to be full-width
+    const styleId = 'pact-full-bleed-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        .CanvasSection-col { max-width: none !important; width: 100% !important; }
+        .ControlZone { max-width: none !important; padding: 0 !important; }
+        .CanvasZone { max-width: none !important; }
+        .pact-full-width-container { width: 100% !important; max-width: none !important; }
+      `;
+      document.head.appendChild(style);
     }
 
-    let renderTarget: HTMLDivElement | HTMLElement = this.domElement;
-    if (isWorkbench) {
-      try {
-        renderTarget = this._ensureWorkbenchHost();
-      } catch (error) {
-        // If the overlay cannot be created, fall back to the normal web part container.
-        // The app should still render rather than fail the whole bundle.
-        // eslint-disable-next-line no-console
-        console.error('PACT workbench overlay failed, falling back to normal mount', error);
-        renderTarget = this.domElement;
-      }
-    }
-
-    if (!renderTarget) {
-      return;
-    }
-
-    if (!isWorkbench && this._workbenchHost) {
-      // eslint-disable-next-line @rushstack/pair-react-dom-render-unmount
-      ReactDom.unmountComponentAtNode(this._workbenchHost);
-      this._workbenchHost.remove();
-      this._workbenchHost = null;
-    }
-
-    this.domElement.style.display = 'block';
-    this.domElement.style.maxWidth = 'none';
-    this.domElement.style.position = 'relative';
+    this.domElement.classList.add('pact-full-width-container');
     this.domElement.style.width = '100%';
-    this.domElement.style.minWidth = '1000px';
-    this.domElement.style.height = 'auto';
-    this.domElement.style.overflowX = 'auto';
-    this.domElement.style.overflowY = 'hidden';
+    this.domElement.style.maxWidth = 'none';
 
     const element: React.ReactElement<IPactAppProps> = React.createElement(
       PactApp,
@@ -71,14 +51,12 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
         environmentMessage: this._environmentMessage,
         hasTeamsContext: !!this.context.sdks.microsoftTeams,
         userDisplayName: this.context.pageContext.user.displayName,
-        context: this.context
+        context: this.context,
+        viewMode: this.properties.viewMode || 'Admin'
       }
     );
 
-    // eslint-disable-next-line @rushstack/pair-react-dom-render-unmount
-    ReactDom.unmountComponentAtNode(renderTarget);
-    // eslint-disable-next-line @rushstack/pair-react-dom-render-unmount
-    ReactDom.render(element, renderTarget);
+    ReactDom.render(element, this.domElement);
   }
 
   protected onInit(): Promise<void> {
@@ -86,8 +64,6 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
       this._environmentMessage = message;
     });
   }
-
-
 
   private _getEnvironmentMessage(): Promise<string> {
     if (!!this.context.sdks.microsoftTeams) { // running in Teams, office.com or Outlook
@@ -135,49 +111,7 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
   }
 
   protected onDispose(): void {
-    if (this._workbenchHost) {
-      // eslint-disable-next-line @rushstack/pair-react-dom-render-unmount
-      ReactDom.unmountComponentAtNode(this._workbenchHost);
-      this._workbenchHost.remove();
-      this._workbenchHost = null;
-    }
-    // eslint-disable-next-line @rushstack/pair-react-dom-render-unmount
     ReactDom.unmountComponentAtNode(this.domElement);
-  }
-
-  private _ensureWorkbenchHost(): HTMLDivElement {
-    if (this._workbenchHost) {
-      return this._workbenchHost;
-    }
-
-    if (typeof document === 'undefined' || !document.body) {
-      throw new Error('Workbench host cannot be created before document.body is available');
-    }
-
-    const host = document.createElement('div');
-    host.id = 'pact-workbench-overlay';
-    host.className = 'pact-workbench-overlay glass-panel';
-    host.style.position = 'fixed';
-    host.style.top = '40px';
-    host.style.left = '0';
-    host.style.right = '360px';
-    host.style.bottom = '0';
-    host.style.width = 'auto';
-    host.style.height = 'auto';
-    host.style.minWidth = '1280px';
-    host.style.maxWidth = 'none';
-    host.style.zIndex = '2000';
-    host.style.background = 'var(--bg-base)';
-    host.style.overflow = 'auto';
-    host.style.boxShadow = 'none';
-    host.style.border = 'none';
-    host.style.borderRadius = '0';
-    host.style.margin = '0';
-    host.style.padding = '16px';
-
-    document.body.appendChild(host);
-    this._workbenchHost = host;
-    return host;
   }
 
   protected get dataVersion(): Version {
@@ -189,14 +123,21 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
       pages: [
         {
           header: {
-            description: strings.PropertyPaneDescription
+            description: "PACT Platform Configuration"
           },
           groups: [
             {
-              groupName: strings.BasicGroupName,
+              groupName: "Interface Settings",
               groupFields: [
                 PropertyPaneTextField('description', {
-                  label: strings.DescriptionFieldLabel
+                  label: "App Description"
+                }),
+                PropertyPaneChoiceGroup('viewMode', {
+                  label: "View Mode",
+                  options: [
+                    { key: 'Admin', text: 'Admin Dashboard (Default)', iconProps: { officeFabricIconFontName: 'Admin' } },
+                    { key: 'PublicReport', text: 'Public Reporting Form', iconProps: { officeFabricIconFontName: 'ReportDocument' } }
+                  ]
                 })
               ]
             }

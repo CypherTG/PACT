@@ -81,10 +81,10 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="kpi-card glass-panel">
-          <div className="kpi-icon primary"><FileSearch size={24} /></div>
+          <div className="kpi-icon primary"><TrendingUp size={24} /></div>
           <div className="kpi-content">
-            <span className="kpi-label">Pending Appeals</span>
-            <span className="kpi-value">{stats.pendingAppeals}</span>
+            <span className="kpi-label">Financial Recovery</span>
+            <span className="kpi-value">₦{stats.totalFines.toLocaleString()}</span>
           </div>
         </div>
 

@@ -11,6 +11,8 @@ import { AppealsPage } from './components/Appeals/AppealsPage';
 import { PolicyLibrary } from './components/Policies/PolicyLibrary';
 import { StaffProfile } from './components/Staff/StaffProfile';
 import { MailLogPage } from './components/Admin/MailLogPage';
+import { ResponseLayout } from './components/Response/ResponseLayout';
+import { CaseResponsePage } from './components/Response/CaseResponsePage';
 
 // Placeholder components to prevent routing crashes
 const Settings = () => <div className="glass-panel" style={{padding: '2rem'}}><h2>Settings</h2><p>Coming soon...</p></div>;
@@ -19,6 +21,7 @@ export const App: React.FC = () => {
   return (
     <Router>
       <Routes>
+        {/* ─── Admin / Internal Routes (with sidebar) ─── */}
         <Route path="/" element={<Layout />}>
           <Route index element={<DashboardPage />} />
           <Route path="cases" element={<CasesListPage />} />
@@ -31,6 +34,11 @@ export const App: React.FC = () => {
           <Route path="policies" element={<PolicyLibrary />} />
           <Route path="admin/mail-log" element={<MailLogPage />} />
           <Route path="settings" element={<Settings />} />
+        </Route>
+
+        {/* ─── Employee Response Routes (standalone, no sidebar) ─── */}
+        <Route path="/case-response" element={<ResponseLayout />}>
+          <Route path=":caseId/:action" element={<CaseResponsePage />} />
         </Route>
       </Routes>
     </Router>

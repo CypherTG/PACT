@@ -1,12 +1,19 @@
-import React from 'react';
-import { Search, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { PolicyOffence } from '../../config/types';
-import { useSharePointCollection } from '../../hooks/useSharePointCollection';
 
 export const PolicyLibrary: React.FC = () => {
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const { data: policies, loading, refresh } = useSharePointCollection<PolicyOffence>(() => sharePointService.getPolicyLibrary());
+  const [policies, setPolicies] = useState<PolicyOffence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    sharePointService.getPolicyLibrary().then(data => {
+      setPolicies(data);
+      setLoading(false);
+    });
+  }, []);
 
   const filteredPolicies = policies.filter(p => 
     p.offenceName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -25,9 +32,6 @@ export const PolicyLibrary: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)}>
-          <RefreshCw size={16} /> Refresh
-        </button>
       </div>
 
       <div className="cases-table-container glass-panel">
@@ -43,6 +47,7 @@ export const PolicyLibrary: React.FC = () => {
                 <th>Auto-Escalate?</th>
                 <th>1st Offence Action</th>
                 <th>2nd Offence Action</th>
+                <th>3rd Offence Action</th>
               </tr>
             </thead>
             <tbody>
@@ -63,6 +68,7 @@ export const PolicyLibrary: React.FC = () => {
                   </td>
                   <td className="text-secondary">{p.firstOffenceAction}</td>
                   <td className="text-secondary">{p.secondOffenceAction}</td>
+                  <td className="text-secondary">{p.thirdOffenceAction}</td>
                 </tr>
               ))}
               {filteredPolicies.length === 0 && (

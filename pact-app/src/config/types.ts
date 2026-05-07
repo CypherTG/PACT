@@ -18,7 +18,7 @@ export interface ComplianceCase {
   dueDate: string;
   issuerName: string;
   secondaryContact: string;
-  status: 'Unpaid' | 'Paid' | 'Overdue' | 'Waived';
+  status: 'Unpaid' | 'Paid' | 'Overdue' | 'Waived' | 'Acknowledged';
   dateCreated: string;
   evidence?: string;
 }
@@ -160,7 +160,10 @@ export type PageRoute =
   | 'escalations'
   | 'appeals'
   | 'policies'
-  | 'settings';
+  | 'settings'
+  | 'case-response';
+
+export type CaseResponseAction = 'accept' | 'appeal';
 
 export interface NavigationItem {
   route: PageRoute;

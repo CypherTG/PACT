@@ -61,8 +61,12 @@ export const StaffDirectory: React.FC = () => {
                 <tr key={s.id}>
                   <td>
                     <div className="person-cell">
-                      <div className="person-avatar" style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}>
-                        {s.fullName.charAt(0)}
+                      <div className="person-avatar" style={{ background: s.photoUrl ? 'none' : 'rgba(255,255,255,0.05)', color: 'white', overflow: 'hidden' }}>
+                        {s.photoUrl ? (
+                          <img src={s.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          s.fullName.charAt(0)
+                        )}
                       </div>
                       <div>
                         <NavLink to={`/staff/${s.id}`} className="link-action" style={{ fontWeight: 600, fontSize: '1rem', display: 'block' }}>

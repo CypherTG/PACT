@@ -11,6 +11,9 @@ import { AppealsPage } from './components/Appeals/AppealsPage';
 import { PolicyLibrary } from './components/Policies/PolicyLibrary';
 import { StaffProfile } from './components/Staff/StaffProfile';
 import { MailLogPage } from './components/Admin/MailLogPage';
+import { ResponseLayout } from './components/Response/ResponseLayout';
+import { CaseResponsePage } from './components/Response/CaseResponsePage';
+import { PublicReportPage } from './components/Public/PublicReportPage';
 
 // Placeholder components to prevent routing crashes
 const Settings = (): React.ReactElement => (
@@ -20,24 +23,54 @@ const Settings = (): React.ReactElement => (
   </div>
 );
 
-export const App = (): React.ReactElement => {
+export const App = ({ viewMode }: { viewMode?: 'Admin' | 'PublicReport' }): React.ReactElement => {
+  // Determine if we should show the public report view
+  // We check BOTH the web part property AND the URL hash for maximum flexibility
+  const isReportMode = viewMode === 'PublicReport' || 
+                       window.location.href.toLowerCase().includes('report');
+
+  if (isReportMode) {
+    return (
+      <ResponseLayout>
+        <PublicReportPage />
+      </ResponseLayout>
+    );
+  }
+
   return (
     <Router>
-      <Layout>
-        <Switch>
-          <Route exact path="/" component={DashboardPage} />
-          <Route exact path="/cases" component={CasesListPage} />
-          <Route exact path="/cases/new" component={NewCaseForm} />
-          <Route exact path="/cases/:id" component={CaseDetail} />
-          <Route exact path="/staff" component={StaffDirectory} />
-          <Route exact path="/staff/:id" component={StaffProfile} />
-          <Route exact path="/escalations" component={EscalationLog} />
-          <Route exact path="/appeals" component={AppealsPage} />
-          <Route exact path="/policies" component={PolicyLibrary} />
-          <Route exact path="/admin/mail-log" component={MailLogPage} />
-          <Route exact path="/settings" component={Settings} />
-        </Switch>
-      </Layout>
+      <Switch>
+        {/* ─── Employee Response Routes (standalone, no sidebar) ─── */}
+        <Route exact path="/case-response/:caseId/:action">
+          <ResponseLayout>
+            <CaseResponsePage />
+          </ResponseLayout>
+        </Route>
+
+        <Route exact path="/report">
+          <ResponseLayout>
+            <PublicReportPage />
+          </ResponseLayout>
+        </Route>
+
+        {/* ─── Admin / Internal Routes (with sidebar) ─── */}
+        <Route path="/:adminPath*">
+          <Layout>
+            <Switch>
+              <Route exact path="/" component={DashboardPage} />
+              <Route exact path="/cases" component={CasesListPage} />
+              <Route exact path="/cases/new" component={NewCaseForm} />
+              <Route exact path="/cases/:id" component={CaseDetail} />
+              <Route exact path="/staff" component={StaffDirectory} />
+              <Route exact path="/staff/:id" component={StaffProfile} />
+              <Route exact path="/escalations" component={EscalationLog} />
+              <Route exact path="/policies" component={PolicyLibrary} />
+              <Route exact path="/admin/mail-log" component={MailLogPage} />
+              <Route exact path="/settings" component={Settings} />
+            </Switch>
+          </Layout>
+        </Route>
+      </Switch>
     </Router>
   );
 };

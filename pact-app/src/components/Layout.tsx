@@ -10,7 +10,6 @@ const navigation = [
   { name: 'Compliance Cases', href: '/cases', icon: ShieldAlert },
   { name: 'Staff Directory', href: '/staff', icon: Users },
   { name: 'Escalation Log', href: '/escalations', icon: AlertTriangle },
-  { name: 'Appeals', href: '/appeals', icon: FileSearch },
   { name: 'Policy Library', href: '/policies', icon: FileText },
   { name: 'Communication Log', href: '/admin/mail-log', icon: Mail },
   { name: 'Settings', href: '/settings', icon: Settings },

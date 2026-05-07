@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, COMPLIANCE_EMAIL } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -295,6 +295,12 @@ export class SharePointService {
     }
   }
 
+  // --- Get Case by Reference (e.g. PACT-001) ---
+  public async getCaseByReference(ref: string): Promise<ComplianceCase | null> {
+    const cases = await this.getCases();
+    return cases.find(c => c.title === ref) || null;
+  }
+
 
   // --- Staff ---
 
@@ -465,6 +471,30 @@ export class SharePointService {
     if (manager?.email) recipients.push(manager.email);
     await this.sendEmailNotification(recipients, emailSubject, emailBody);
     */
+
+    // Tier 3 → Automatic Compliance + Legal notification
+    if (policy?.tier === 'Tier 3') {
+      const tier3Subject = `⚠️ PACT TIER 3 ALERT: ${this.expandAbbreviations(policy.offenceName)} - ${newCase.chargedPersonName} (Ref: ${newCase.title})`;
+      const tier3Body = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 20px; border: 2px solid #d13438; border-radius: 8px;">
+          <h2 style="color: #d13438; margin-top: 0;">🚨 Tier 3 Offence — Immediate Attention Required</h2>
+          <p>A <b>Tier 3 compliance violation</b> has been logged in the PACT system. This requires immediate review by HR and Legal.</p>
+          <div style="background: #fff4f4; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+              <tr><td style="color: #666; padding: 8px 0; width: 150px;">Reference:</td><td style="font-weight: bold;">${newCase.title}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Charged Person:</td><td>${newCase.chargedPersonName}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Department:</td><td>${newCase.department}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Offence:</td><td>${this.expandAbbreviations(policy.offenceName)}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Description:</td><td>${newCase.offenceDescription}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Penalty:</td><td style="font-weight: bold; color: #d13438;">₦${newCase.penaltyAmount.toLocaleString()}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Disciplinary Action:</td><td style="font-weight: bold;">${disciplinaryAction}</td></tr>
+            </table>
+          </div>
+          <p style="font-size: 13px; color: #666;">This notification was generated automatically by the PACT Compliance Governance Platform.</p>
+        </div>
+      `;
+      await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL], tier3Subject, tier3Body);
+    }
 
     // 4. Persistence
 
@@ -996,10 +1026,10 @@ export class SharePointService {
       });
     }
 
-    // Email to Legal/Admin
+    // Email to HR
     const subject = `PACT APPEAL FILED: Case ${appeal.caseReference}`;
-    const body = `<p>An appeal has been filed by <b>${appeal.appellant}</b> for Case <b>${appeal.caseReference}</b>.</p><p>Grounds: ${appeal.grounds}</p>`;
-    await this.sendEmailNotification(['legal@konstructum.com'], subject, body);
+    const body = `<p>An appeal has been filed by <b>${appeal.appellant}</b> for Case <b>${appeal.caseReference}</b>.</p><p>Grounds: ${appeal.grounds}</p><p><b>Please review within 3 working days.</b></p>`;
+    await this.sendEmailNotification([HR_EMAIL], subject, body);
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {

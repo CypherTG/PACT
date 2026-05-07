@@ -3,6 +3,13 @@
  * Central configuration for SharePoint site, list names, and column internal names
  */
 
+// ─── Organisation Email Addresses ───────────────────────────────────────────
+export const HR_EMAIL = 'mbello@konstructum.com'; // HR Department
+export const LEGAL_EMAIL = 'legal@konstructum.com'; // Legal Department
+export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeholder)
+export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
+export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
+
 // ─── SharePoint Site ────────────────────────────────────────────────────────
 export const SHAREPOINT_SITE_URL = 'netorgft13110820.sharepoint.com';
 export const SHAREPOINT_SITE_PATH = '/sites/KONSTRUCTUM';
@@ -113,7 +120,7 @@ export const COLUMNS = {
 } as const;
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
-export const CASE_STATUS = ['Unpaid', 'Paid', 'Overdue', 'Waived'] as const;
+export const CASE_STATUS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Acknowledged'] as const;
 export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'] as const;
 export const CATEGORIES = ['Conduct', 'Project Integrity', 'Strategic', 'EHSQ'] as const;
 export const COMPANIES = ['KCC', 'KESL', 'Interkonstruct'] as const;
@@ -126,5 +133,5 @@ export const APPEAL_DECISIONS = ['Upheld', 'Reduced', 'Waived', 'Rejected'] as c
 export const RISK_LEVELS = ['Low', 'Medium', 'High', 'Critical'] as const;
 
 // ─── Escalation Rules ───────────────────────────────────────────────────────
-export const ESCALATION_THRESHOLD = 2; // Escalate when existing Tier 1 count reaches 2 (i.e. 3rd offence triggers upgrade to Tier 2)
+export const ESCALATION_THRESHOLD = 2; // Number of Tier 1 offences in history to trigger escalation on the NEXT one (e.g. 2 existing + 1 current = 3 total)
 export const ESCALATION_WINDOW_MONTHS = 6; // Rolling window in months

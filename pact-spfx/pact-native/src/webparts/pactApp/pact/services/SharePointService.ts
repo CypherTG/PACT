@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, COMPLIANCE_EMAIL } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -96,7 +96,15 @@ export class SharePointService {
 
   // Returns the photo URL for a specific staff member
   public getPhotoUrl(email: string): string {
-    return `/_layouts/15/userphoto.aspx?size=S&accountname=${encodeURIComponent(email)}`;
+    return `/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(email)}`;
+  }
+
+  public getUserName(): string {
+    return this.getCurrentSession().displayName;
+  }
+
+  public getUserEmail(): string {
+    return this.getCurrentSession().email;
   }
 
 
@@ -284,10 +292,6 @@ export class SharePointService {
     return this.runtimeMode === 'sharepoint' ? 'SharePoint Native' : 'Workbench Demo';
   }
 
-  public getUserName(): string {
-    return "PACT Administrator";
-  }
-
   // --- Cases ---
   public async getCases(): Promise<ComplianceCase[]> {
     try {
@@ -314,11 +318,50 @@ export class SharePointService {
   }
 
 
+  // --- Get Case by Reference (e.g. PACT-001) ---
+  public async getCaseByReference(ref: string): Promise<ComplianceCase | null> {
+    const cases = await this.getCases();
+    return cases.find(c => c.title === ref) || null;
+  }
+
   // --- Staff ---
 
   public async getStaffDirectory(): Promise<StaffMember[]> {
-    // ALWAYS use local JSON data for now as requested
-    return staffData as StaffMember[];
+    if (this.isLocal) {
+      return staffData as StaffMember[];
+    }
+    
+    try {
+      const cached = this.getFromCache<StaffMember[]>('staff_directory');
+      if (cached) return cached;
+
+      console.log("[PACT] Fetching live staff directory from SharePoint...");
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.STAFF_DIRECTORY}')/items?$top=5000`;
+      const data = await this.fetchREST(endpoint);
+      
+      if (!data || !data.results) {
+        throw new Error("No results returned from Staff Directory list");
+      }
+
+      const mapped: StaffMember[] = data.results.map((item: any) => ({
+        id: item.ID.toString(),
+        fullName: item.Title || 'Unnamed Staff',
+        email: this.readField(item, COLUMNS.STAFF.EMAIL, 'Email', 'StaffEmail', 'Staff_x0020_Email') || '',
+        department: this.readField(item, COLUMNS.STAFF.DEPARTMENT, 'Department') || 'General',
+        role: this.readField(item, COLUMNS.STAFF.ROLE, 'Role', 'JobTitle', 'Job_x0020_Title') || 'Staff',
+        lineManager: this.readField(item, COLUMNS.STAFF.LINE_MANAGER, 'LineManager', 'Manager', 'Line_x0020_Manager') || '',
+        company: this.readField(item, COLUMNS.STAFF.COMPANY, 'Company', 'Company_x0020_Name') || 'KONSTRUCTUM',
+        employeeType: this.readField(item, COLUMNS.STAFF.EMPLOYEE_TYPE, 'EmployeeType', 'Employee_x0020_Type') || 'Employee',
+        status: (this.readField(item, 'Status', 'EmployeeStatus') || 'Active') as 'Active' | 'Inactive',
+        photoUrl: this.getPhotoUrl(this.readField(item, COLUMNS.STAFF.EMAIL, 'Email', 'StaffEmail', 'Staff_x0020_Email') || '')
+      }));
+      
+      this.setCache('staff_directory', mapped);
+      return mapped;
+    } catch (error) {
+      console.warn("Failed to fetch live staff from SharePoint, falling back to local directory", error);
+      return staffData as StaffMember[];
+    }
   }
 
   // --- Policies ---
@@ -384,20 +427,22 @@ export class SharePointService {
     const policies = await this.getPolicyLibrary();
     const policy = policies.find(p => p.id === caseData.offenceCategory);
 
+    const DUMMY_TEST_EMAIL = 'mbello@konstructum.com';
+
     const newCase: ComplianceCase = {
       id: newId,
       title: `PACT-${nextNumber}`,
-      chargedPerson: caseData.chargedPerson || '999',
+      chargedPerson: String(caseData.chargedPerson || '999'),
       chargedPersonName: person?.fullName || 'Unknown Staff',
-      staffEmail: person?.email || 'staff@konstructum.com',
+      staffEmail: DUMMY_TEST_EMAIL, // Redirecting for testing
       department: person?.department || 'General',
-      offenceCategory: caseData.offenceCategory || 'Unknown', // This is the ID
-      offenceCategoryName: this.expandAbbreviations(policy?.offenceName || 'Unknown Offence'), // This is the Name
+      offenceCategory: String(caseData.offenceCategory || '0'),
+      offenceCategoryName: this.expandAbbreviations(policy?.offenceName || 'Unknown Offence'),
       offenceDescription: caseData.offenceDescription || '',
       penaltyAmount: policy?.defaultPenaltyAmount || 0,
       dueDate: caseData.dueDate || new Date().toISOString(),
       issuerName: this.getUserName(),
-      secondaryContact: person?.lineManager || '',
+      secondaryContact: DUMMY_TEST_EMAIL, // Redirecting for testing
       status: 'Unpaid',
       dateCreated: new Date().toISOString()
     };
@@ -572,6 +617,30 @@ export class SharePointService {
     }
     */
 
+    // Tier 3 → Automatic Compliance + Legal notification
+    if (policy?.tier === 'Tier 3') {
+      const tier3Subject = `⚠️ PACT TIER 3 ALERT: ${this.expandAbbreviations(policy.offenceName)} - ${newCase.chargedPersonName} (Ref: ${newCase.title})`;
+      const tier3Body = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 20px; border: 2px solid #d13438; border-radius: 8px;">
+          <h2 style="color: #d13438; margin-top: 0;">🚨 Tier 3 Offence — Immediate Attention Required</h2>
+          <p>A <b>Tier 3 compliance violation</b> has been logged in the PACT system. This requires immediate review by HR and Legal.</p>
+          <div style="background: #fff4f4; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+              <tr><td style="color: #666; padding: 8px 0; width: 150px;">Reference:</td><td style="font-weight: bold;">${newCase.title}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Charged Person:</td><td>${newCase.chargedPersonName}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Department:</td><td>${newCase.department}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Offence:</td><td>${this.expandAbbreviations(policy.offenceName)}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Description:</td><td>${newCase.offenceDescription}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Penalty:</td><td style="font-weight: bold; color: #d13438;">₦${newCase.penaltyAmount.toLocaleString()}</td></tr>
+              <tr><td style="color: #666; padding: 8px 0;">Disciplinary Action:</td><td style="font-weight: bold;">${disciplinaryAction}</td></tr>
+            </table>
+          </div>
+          <p style="font-size: 13px; color: #666;">This notification was generated automatically by the PACT Compliance Governance Platform.</p>
+        </div>
+      `;
+      await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL], tier3Subject, tier3Body);
+    }
+
     // 6. Persistence & Power Automate Submission
     if (this.isLocal || POWER_AUTOMATE_URL) {
       // Local tracking for dashboard
@@ -581,10 +650,13 @@ export class SharePointService {
 
       // Power Automate Submission — enriched payload
       if (POWER_AUTOMATE_URL) {
+        console.log("Triggering Power Automate with payload:", newCase);
         try {
           const payload = {
             ...newCase,
-            offenceName: policy?.offenceName || newCase.offenceCategoryName, // Use the string name
+            offenceCategory: Number(newCase.offenceCategory) || 0,
+            chargedPerson: Number(newCase.chargedPerson) || 0,
+            offenceName: policy?.offenceName || newCase.offenceCategoryName,
             tier: policyTier,
             offenceCount: offCount,
             actionLabel: actionPath,
@@ -593,11 +665,43 @@ export class SharePointService {
             firstOffenceAction: policy?.firstOffenceAction || '',
             secondOffenceAction: policy?.secondOffenceAction || '',
             thirdOffenceAction: policy?.thirdOffenceAction || '',
-            lineManagerEmail: manager?.email || '',
-            lineManagerName: manager?.fullName || '',
+            lineManagerEmail: 'mbello@konstructum.com', // Redirecting for testing
+            lineManagerName: manager?.fullName || 'Test Supervisor',
             isEscalated: isEscalated,
-            penaltyAmount: newCase.penaltyAmount // Ensure number
+            penaltyAmount: newCase.penaltyAmount,
+            // Standalone links as fallback
+            acceptUrl: `${window.location.origin}${window.location.pathname}#/accept?caseId=${newCase.title}`,
+            appealUrl: `${window.location.origin}${window.location.pathname}#/appeal?caseId=${newCase.title}`,
+            // Pre-rendered HTML for Power Automate buttons (Optimized for Outlook/Mobile)
+            emailButtonHtml: `
+              <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="font-family: Arial, sans-serif; font-size: 14px; color: #444; margin-bottom: 20px;">Please click a button below to respond to this notice:</p>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td style="padding-bottom: 20px;">
+                      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" bgcolor="#0078d4" style="border-radius: 4px;">
+                            <a href="${window.location.origin}${window.location.pathname}#/accept?caseId=${newCase.title}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                              Accept & Pay Fine
+                            </a>
+                          </td>
+                          <td width="15"></td>
+                          <td align="center" bgcolor="#ffffff" style="border-radius: 4px; border: 1px solid #cccccc;">
+                            <a href="${window.location.origin}${window.location.pathname}#/appeal?caseId=${newCase.title}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #333333; text-decoration: none; font-weight: bold; display: inline-block;">
+                              Appeal Decision
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            `
           };
+
+          console.log("Full Power Automate Payload:", payload);
 
           const response = await fetch(POWER_AUTOMATE_URL, {
             method: 'POST',
@@ -1093,10 +1197,10 @@ export class SharePointService {
       });
     }
 
-    // Email to Legal/Admin
+    // Email to HR
     const subject = `PACT APPEAL FILED: Case ${appeal.caseReference}`;
-    const body = `<p>An appeal has been filed by <b>${appeal.appellant}</b> for Case <b>${appeal.caseReference}</b>.</p><p>Grounds: ${appeal.grounds}</p>`;
-    await this.sendEmailNotification(['legal@konstructum.com'], subject, body);
+    const body = `<p>An appeal has been filed by <b>${appeal.appellant}</b> for Case <b>${appeal.caseReference}</b>.</p><p>Grounds: ${appeal.grounds}</p><p><b>Please review within 3 working days.</b></p>`;
+    await this.sendEmailNotification([HR_EMAIL], subject, body);
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {
