@@ -6,7 +6,7 @@
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(autofit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
 
@@ -109,10 +109,18 @@
   gap: 24px;
 }
 
+@media (min-width: 1024px) {
+  .dashboard-lists-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
 .activity-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .activity-item {
@@ -144,17 +152,28 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .activity-title {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activity-desc {
   font-size: 0.85rem;
   color: var(--text-secondary);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .activity-time {

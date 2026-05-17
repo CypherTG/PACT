@@ -1,22 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { sharePointService } from '../../services/SharePointService';
 import type { ComplianceCase } from '../../config/types';
 import { PaymentDetailsPage } from './PaymentDetailsPage';
 import { AppealSubmissionPage } from './AppealSubmissionPage';
 import { AlertTriangle } from 'lucide-react';
 
+function getHashQueryParams(): URLSearchParams {
+  const raw = typeof window !== 'undefined' ? window.location.hash : '';
+  const q = raw.indexOf('?');
+  return q >= 0 ? new URLSearchParams(raw.slice(q + 1)) : new URLSearchParams();
+}
+
+function buildFallbackCase(caseId: string): ComplianceCase {
+  const params = getHashQueryParams();
+  const dateCreated = params.get('date') || new Date().toISOString();
+  const dueDate = params.get('due') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const amount = Number(params.get('amount') || 0);
+
+  return {
+    id: 'fallback',
+    title: caseId,
+    chargedPerson: '0',
+    chargedPersonName: params.get('name') || 'Staff Member',
+    offenceCategory: '0',
+    offenceCategoryName: params.get('offence') || 'Compliance notice',
+    penaltyAmount: Number.isFinite(amount) ? amount : 0,
+    dueDate,
+    staffEmail: params.get('email') || '',
+    department: params.get('department') || 'Not specified',
+    offenceDescription: params.get('description') || 'Please review the case details provided in your compliance notice.',
+    issuerName: '',
+    secondaryContact: '',
+    status: 'Unpaid',
+    dateCreated
+  };
+}
+
 /**
- * CaseResponsePage — Router wrapper for employee email links.
- * Reads :caseId and :action from the URL and renders the appropriate view.
- * 
- * URL format: /case-response/:caseId/:action
- * - /case-response/PACT-001/accept → Payment Details
- * - /case-response/PACT-001/appeal → Appeal Form
+ * CaseResponsePage — Employee Accept / Appeal landing page.
+ * Reads :caseId and :action from the URL and renders the correct self-service view.
  */
 export const CaseResponsePage: React.FC = () => {
   const { caseId, action } = useParams<{ caseId: string; action: string }>();
-  const navigate = useNavigate();
   const [caseData, setCaseData] = useState<ComplianceCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +59,9 @@ export const CaseResponsePage: React.FC = () => {
         }
 
         const found = await sharePointService.getCaseByReference(caseId);
+        
         if (!found) {
-          setError(`Case "${caseId}" not found. Please check the link in your email.`);
+          setCaseData(buildFallbackCase(caseId));
           setLoading(false);
           return;
         }
@@ -79,11 +106,9 @@ export const CaseResponsePage: React.FC = () => {
     );
   }
 
-  // Route to the correct view
   if (action === 'appeal') {
     return <AppealSubmissionPage caseData={caseData} />;
   }
 
-  // Default to payment details (accept)
   return <PaymentDetailsPage caseData={caseData} />;
 };

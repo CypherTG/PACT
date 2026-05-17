@@ -203,7 +203,7 @@
   font-weight: 800;
   color: #e94560;
   margin: 8px 0;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .penalty-label {

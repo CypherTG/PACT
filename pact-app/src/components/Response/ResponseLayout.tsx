@@ -13,30 +13,23 @@ export const ResponseLayout: React.FC = () => {
       <header className="response-header">
         <div className="response-logo">
           <img
-            src="./kcc-logo.png"
+            src="/kcc-logo.png"
             alt="KCC"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-              const fallback = document.getElementById('response-logo-fallback');
-              if (fallback) fallback.style.display = 'flex';
-            }}
           />
-          <div id="response-logo-fallback" className="response-logo-fallback" style={{ display: 'none' }}>
-            P
-          </div>
           <h1>PACT</h1>
         </div>
-        <span className="response-header-badge">Compliance Governance Platform</span>
+        <span className="response-header-badge">Konstructum Compliance Governance</span>
       </header>
 
       {/* Content */}
-      <div className="response-content">
+      <main className="response-content">
         <Outlet />
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="response-footer">
-        PACT Compliance Governance Platform © {new Date().getFullYear()} Konstructum. All rights reserved.
+        <p>This is a secure, automated notification system for Konstructum Group.</p>
+        <p>PACT Compliance Governance Platform © {new Date().getFullYear()}. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -10,6 +10,22 @@ export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeho
 export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
 export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
 
+/**
+ * Employee case-response one-pager (e.g. Vercel). Routes use HashRouter:
+ * `/#/case-response/:caseRef/:action?...`
+ * Set in `.env`: `VITE_RESPONSE_PORTAL_URL=https://your-app.vercel.app`
+ * Leave empty to use the current page origin (SharePoint or local dev).
+ */
+export const RESPONSE_PORTAL_BASE_URL = String(import.meta.env.VITE_RESPONSE_PORTAL_URL ?? '')
+  .trim()
+  .replace(/\/$/, '');
+
+/**
+ * Accept / Appeal flows are gated: valid only when the URL includes this query (added to every email button link).
+ */
+export const CASE_RESPONSE_FROM_EMAIL_QUERY_KEY = 'pact_src';
+export const CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE = 'email';
+
 // ─── SharePoint Site ────────────────────────────────────────────────────────
 export const SHAREPOINT_SITE_URL = 'netorgft13110820.sharepoint.com';
 export const SHAREPOINT_SITE_PATH = '/sites/KONSTRUCTUM';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, FileSearch, ShieldAlert, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, ShieldAlert, Mail } from 'lucide-react';
 import './Layout.css';
 import { sharePointService } from '../services/SharePointService';
 import { WorkbenchBridge } from './Runtime/WorkbenchBridge';
@@ -23,7 +23,6 @@ export const Layout: React.FC = () => {
   }, []);
 
   const username = sharePointService.getUserName();
-  const runtimeLabel = sharePointService.getRuntimeLabel();
   const runtimeConnectionLabel = sharePointService.isStandalone()
     ? 'Workbench Demo'
     : 'SharePoint Native';

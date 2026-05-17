@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Clock, CreditCard, AlertTriangle, Building } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle, Building } from 'lucide-react';
 import type { ComplianceCase } from '../../config/types';
 import { PAYMENT_DEADLINE_DAYS } from '../../config/constants';
 

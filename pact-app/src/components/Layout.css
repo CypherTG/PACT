@@ -2,6 +2,7 @@
   display: flex;
   min-height: 100vh;
   width: 100%;
+  max-width: none;
   overflow: hidden;
   background: radial-gradient(circle at top left, rgba(233, 69, 96, 0.15) 0%, transparent 40%),
               radial-gradient(circle at bottom right, rgba(0, 120, 212, 0.1) 0%, transparent 40%),
@@ -11,6 +12,7 @@
 /* Sidebar Styles */
 .sidebar {
   width: 280px;
+  flex: 0 0 280px;
   min-height: calc(100vh - 32px);
   margin: 16px 0 16px 16px;
   display: flex;
@@ -198,19 +200,22 @@
 
 /* Main Content Styles */
 .main-content {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: clamp(12px, 1.5vw, 24px);
   min-height: 100vh;
   min-width: 0;
+  width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .top-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 16px 24px;
   margin-bottom: 24px;
   position: sticky;
@@ -229,6 +234,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .header-runtime-badge {
@@ -289,10 +295,30 @@
 }
 
 .page-container {
-  flex: 1;
-  max-width: 1400px;
-  margin: 0 auto;
+  flex: 1 1 auto;
+  max-width: none;
+  margin: 0;
   width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 1600px) {
+  .main-content {
+    padding: 28px 32px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .sidebar {
+    width: 236px;
+    flex-basis: 236px;
+    margin: 12px 0 12px 12px;
+    min-height: calc(100vh - 24px);
+  }
+
+  .nav-link {
+    padding: 10px 12px;
+  }
 }
 
 .qa-fab {
@@ -405,7 +431,7 @@
 }
 
 /* Mobile Responsiveness */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .app-layout {
     flex-direction: column;
     overflow-y: auto;
@@ -418,6 +444,7 @@
     border-radius: 0;
     border-bottom: 1px solid var(--border-light);
     flex-shrink: 0;
+    flex-basis: auto;
   }
   .sidebar-header {
     padding: 12px;
@@ -449,9 +476,16 @@
   .top-header {
     padding: 12px;
     margin-bottom: 16px;
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
     gap: 12px;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .header-user-badge {
+    max-width: 100%;
   }
   .pact-table {
     display: block;
@@ -464,6 +498,22 @@
     right: 12px;
     left: 12px;
     width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 1.15rem;
+  }
+
+  .header-actions {
+    align-items: stretch;
+  }
+
+  .header-user-badge,
+  .log-incident-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

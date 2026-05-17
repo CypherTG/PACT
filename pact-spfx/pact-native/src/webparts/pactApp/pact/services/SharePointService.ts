@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, COMPLIANCE_EMAIL } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, COMPLIANCE_EMAIL, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -16,7 +16,14 @@ const staffData = require('../data/staffDirectory.json');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const policyData = require('../data/policyLibrary.json');
 
-// PLACEHOLDER: Power Automate HTTP Trigger URL
+/**
+ * Power Automate HTTP trigger (case creation → notifications).
+ *
+ * Payload includes `acceptUrl`, `appealUrl`, `emailButtonHtml` — built with `pact_src=email`
+ * (`CASE_RESPONSE_FROM_EMAIL_QUERY_*` in config/constants). Required for Accept/Appeal pages.
+ *
+ * Flows that compose links manually must include the same query or use those JSON fields.
+ */
 const POWER_AUTOMATE_URL = "https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/542b00c131884a3e8235161bb10bd625/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EMA0sCNKGWx86m-cXU5EyhZCq3lbbB-pSZVN8CSCk4E"; 
 
 export class SharePointService {
@@ -121,6 +128,70 @@ export class SharePointService {
       .replace(/\bS2\b/g, 'Suspension (2 Days)')
       .replace(/\bS4\b/g, 'Suspension (4 Days)')
       .replace(/\bT&P\b/g, 'Termination & Prosecution');
+  }
+
+  private buildCaseResponseLink(
+    caseRef: string,
+    action: 'accept' | 'appeal',
+    opts: { staffName: string; offenceLabel: string; amount: number; dueIso: string }
+  ): string {
+    const params = new URLSearchParams({
+      name: opts.staffName,
+      offence: opts.offenceLabel,
+      amount: String(opts.amount),
+      date: opts.dueIso,
+      [CASE_RESPONSE_FROM_EMAIL_QUERY_KEY]: CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE,
+    });
+    const hash = `#/case-response/${encodeURIComponent(caseRef)}/${action}?${params.toString()}`;
+    const base =
+      RESPONSE_PORTAL_BASE_URL.length > 0
+        ? RESPONSE_PORTAL_BASE_URL.replace(/\/$/, '')
+        : `${window.location.origin}${window.location.pathname}`;
+    return `${base}${hash}`;
+  }
+
+  private buildEmailButtonHtmlBoth(acceptUrl: string, appealUrl: string): string {
+    return `
+              <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="font-family: Arial, sans-serif; font-size: 14px; color: #444; margin-bottom: 20px;">Please click a button below to respond to this notice:</p>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td style="padding-bottom: 20px;">
+                      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" bgcolor="#0078d4" style="border-radius: 4px;">
+                            <a href="${acceptUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                              Accept & Pay Fine
+                            </a>
+                          </td>
+                          <td width="15"></td>
+                          <td align="center" bgcolor="#ffffff" style="border-radius: 4px; border: 1px solid #cccccc;">
+                            <a href="${appealUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #333333; text-decoration: none; font-weight: bold; display: inline-block;">
+                              Appeal Decision
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </div>`;
+  }
+
+  private buildEmailButtonHtmlAppealOnly(appealUrl: string): string {
+    return `
+              <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="font-family: Arial, sans-serif; font-size: 14px; color: #444; margin-bottom: 20px;">This matter has been escalated. Use the link below to submit an appeal:</p>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" bgcolor="#ffffff" style="border-radius: 4px; border: 1px solid #cccccc;">
+                      <a href="${appealUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #333333; text-decoration: none; font-weight: bold; display: inline-block;">
+                        Appeal decision
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>`;
   }
 
   /**
@@ -652,6 +723,24 @@ export class SharePointService {
       if (POWER_AUTOMATE_URL) {
         console.log("Triggering Power Automate with payload:", newCase);
         try {
+          const staffDisplay = newCase.chargedPersonName || 'Employee';
+          const offenceLabel = policy?.offenceName || newCase.offenceCategoryName || 'Compliance Violation';
+          const acceptUrl = this.buildCaseResponseLink(newCase.title, 'accept', {
+            staffName: staffDisplay,
+            offenceLabel,
+            amount: newCase.penaltyAmount,
+            dueIso: newCase.dueDate,
+          });
+          const appealUrl = this.buildCaseResponseLink(newCase.title, 'appeal', {
+            staffName: staffDisplay,
+            offenceLabel,
+            amount: newCase.penaltyAmount,
+            dueIso: newCase.dueDate,
+          });
+          const emailButtonHtml = isEscalated
+            ? this.buildEmailButtonHtmlAppealOnly(appealUrl)
+            : this.buildEmailButtonHtmlBoth(acceptUrl, appealUrl);
+
           const payload = {
             ...newCase,
             offenceCategory: Number(newCase.offenceCategory) || 0,
@@ -669,36 +758,10 @@ export class SharePointService {
             lineManagerName: manager?.fullName || 'Test Supervisor',
             isEscalated: isEscalated,
             penaltyAmount: newCase.penaltyAmount,
-            // Standalone links as fallback
-            acceptUrl: `${window.location.origin}${window.location.pathname}#/accept?caseId=${newCase.title}`,
-            appealUrl: `${window.location.origin}${window.location.pathname}#/appeal?caseId=${newCase.title}`,
-            // Pre-rendered HTML for Power Automate buttons (Optimized for Outlook/Mobile)
-            emailButtonHtml: `
-              <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                <p style="font-family: Arial, sans-serif; font-size: 14px; color: #444; margin-bottom: 20px;">Please click a button below to respond to this notice:</p>
-                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-                  <tr>
-                    <td style="padding-bottom: 20px;">
-                      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td align="center" bgcolor="#0078d4" style="border-radius: 4px;">
-                            <a href="${window.location.origin}${window.location.pathname}#/accept?caseId=${newCase.title}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
-                              Accept & Pay Fine
-                            </a>
-                          </td>
-                          <td width="15"></td>
-                          <td align="center" bgcolor="#ffffff" style="border-radius: 4px; border: 1px solid #cccccc;">
-                            <a href="${window.location.origin}${window.location.pathname}#/appeal?caseId=${newCase.title}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #333333; text-decoration: none; font-weight: bold; display: inline-block;">
-                              Appeal Decision
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-            `
+            acceptUrl,
+            appealUrl,
+            emailButtonHtml,
+            responsePortalBaseUrl: RESPONSE_PORTAL_BASE_URL || undefined,
           };
 
           console.log("Full Power Automate Payload:", payload);
@@ -1041,7 +1104,12 @@ export class SharePointService {
       });
     }
 
-    // Email Notification for Escalation
+    const appealUrl = this.buildCaseResponseLink(entry.caseReference || '', 'appeal', {
+      staffName: entry.offenderName || 'Employee',
+      offenceLabel: 'Escalated compliance matter',
+      amount: 0,
+      dueIso: new Date().toISOString(),
+    });
     const subject = `PACT ESCALATION: ${entry.caseReference} - TIER UPGRADE`;
     const body = `
       <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 20px; border: 2px solid #d13438; border-radius: 8px;">
@@ -1054,6 +1122,7 @@ export class SharePointService {
           <p><b>Reason:</b> ${entry.escalationReason}</p>
         </div>
         <p>Immediate review by HR / Executive Management is required.</p>
+        ${this.buildEmailButtonHtmlAppealOnly(appealUrl)}
       </div>
     `;
     await this.sendEmailNotification(['hr@konstructum.com'], subject, body);

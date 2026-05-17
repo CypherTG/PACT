@@ -4,7 +4,6 @@ import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
   PropertyPaneTextField,
-  PropertyPaneChoiceGroup
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -15,7 +14,6 @@ import { IPactAppProps } from './components/IPactAppProps';
 
 export interface IPactAppWebPartProps {
   description: string;
-  viewMode: 'Admin' | 'PublicReport';
 }
 
 export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPartProps> {
@@ -31,10 +29,36 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
       const style = document.createElement('style');
       style.id = styleId;
       style.innerHTML = `
-        .CanvasSection-col { max-width: none !important; width: 100% !important; }
-        .ControlZone { max-width: none !important; padding: 0 !important; }
-        .CanvasZone { max-width: none !important; }
-        .pact-full-width-container { width: 100% !important; max-width: none !important; }
+        #workbenchPageContent,
+        .SPCanvas,
+        .Canvas,
+        .CanvasZone,
+        .CanvasSection,
+        .CanvasSection-col,
+        .CanvasComponent,
+        .CanvasControl,
+        .CanvasZoneContainer,
+        .ControlZone,
+        [data-automation-id='CanvasZone'],
+        [data-automation-id='CanvasControl'],
+        [data-automation-id='CanvasSection'],
+        [data-automation-id='CanvasControlWebPart'],
+        [data-sp-webpart],
+        .pact-full-width-container {
+          width: 100% !important;
+          max-width: none !important;
+          min-width: 0 !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          padding-left: 0 !important;
+          padding-right: 0 !important;
+        }
+
+        .ControlZone,
+        .CanvasSection-col,
+        .pact-full-width-container {
+          flex: 1 1 auto !important;
+        }
       `;
       document.head.appendChild(style);
     }
@@ -42,6 +66,7 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
     this.domElement.classList.add('pact-full-width-container');
     this.domElement.style.width = '100%';
     this.domElement.style.maxWidth = 'none';
+    this.domElement.style.minWidth = '0';
 
     const element: React.ReactElement<IPactAppProps> = React.createElement(
       PactApp,
@@ -51,8 +76,7 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
         environmentMessage: this._environmentMessage,
         hasTeamsContext: !!this.context.sdks.microsoftTeams,
         userDisplayName: this.context.pageContext.user.displayName,
-        context: this.context,
-        viewMode: this.properties.viewMode || 'Admin'
+        context: this.context
       }
     );
 
@@ -131,13 +155,6 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
               groupFields: [
                 PropertyPaneTextField('description', {
                   label: "App Description"
-                }),
-                PropertyPaneChoiceGroup('viewMode', {
-                  label: "View Mode",
-                  options: [
-                    { key: 'Admin', text: 'Admin Dashboard (Default)', iconProps: { officeFabricIconFontName: 'Admin' } },
-                    { key: 'PublicReport', text: 'Public Reporting Form', iconProps: { officeFabricIconFontName: 'ReportDocument' } }
-                  ]
                 })
               ]
             }

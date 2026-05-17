@@ -7,13 +7,11 @@ import { NewCaseForm } from './components/Cases/NewCaseForm';
 import { CaseDetail } from './components/Cases/CaseDetail';
 import { StaffDirectory } from './components/Staff/StaffDirectory';
 import { EscalationLog } from './components/Escalations/EscalationLog';
-import { AppealsPage } from './components/Appeals/AppealsPage';
 import { PolicyLibrary } from './components/Policies/PolicyLibrary';
 import { StaffProfile } from './components/Staff/StaffProfile';
 import { MailLogPage } from './components/Admin/MailLogPage';
 import { ResponseLayout } from './components/Response/ResponseLayout';
 import { CaseResponsePage } from './components/Response/CaseResponsePage';
-import { PublicReportPage } from './components/Public/PublicReportPage';
 
 // Placeholder components to prevent routing crashes
 const Settings = (): React.ReactElement => (
@@ -23,20 +21,7 @@ const Settings = (): React.ReactElement => (
   </div>
 );
 
-export const App = ({ viewMode }: { viewMode?: 'Admin' | 'PublicReport' }): React.ReactElement => {
-  // Determine if we should show the public report view
-  // We check BOTH the web part property AND the URL hash for maximum flexibility
-  const isReportMode = viewMode === 'PublicReport' || 
-                       window.location.href.toLowerCase().includes('report');
-
-  if (isReportMode) {
-    return (
-      <ResponseLayout>
-        <PublicReportPage />
-      </ResponseLayout>
-    );
-  }
-
+export const App = (): React.ReactElement => {
   return (
     <Router>
       <Switch>
@@ -44,12 +29,6 @@ export const App = ({ viewMode }: { viewMode?: 'Admin' | 'PublicReport' }): Reac
         <Route exact path="/case-response/:caseId/:action">
           <ResponseLayout>
             <CaseResponsePage />
-          </ResponseLayout>
-        </Route>
-
-        <Route exact path="/report">
-          <ResponseLayout>
-            <PublicReportPage />
           </ResponseLayout>
         </Route>
 

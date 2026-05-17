@@ -287,8 +287,12 @@ export const NewCaseForm: React.FC = () => {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-light)'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-light)';
+              }}
             >
               <Upload size={24} className="text-secondary" style={{ margin: '0 auto 12px' }} />
               <div style={{ color: selectedFile ? 'var(--status-success)' : 'inherit', fontWeight: selectedFile ? 600 : 400 }}>

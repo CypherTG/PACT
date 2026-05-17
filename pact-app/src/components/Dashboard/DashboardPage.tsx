@@ -3,7 +3,6 @@ import {
   Users, 
   AlertTriangle, 
   ShieldAlert, 
-  FileSearch,
   TrendingUp
 } from 'lucide-react';
 import {

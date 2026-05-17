@@ -75,7 +75,7 @@ export default class PactApp extends React.Component<IPactAppProps> {
         userDisplayName
       }}>
         <ErrorBoundary>
-          <App viewMode={this.props.viewMode} />
+          <App />
         </ErrorBoundary>
       </AppContext.Provider>
     );
