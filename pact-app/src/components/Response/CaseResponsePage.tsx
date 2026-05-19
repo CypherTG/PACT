@@ -14,8 +14,8 @@ function getHashQueryParams(): URLSearchParams {
 
 function buildFallbackCase(caseId: string): ComplianceCase {
   const params = getHashQueryParams();
-  const dateCreated = params.get('date') || new Date().toISOString();
-  const dueDate = params.get('due') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const dateCreated = new Date().toISOString();
+  const dueDate = params.get('due') || params.get('date') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const amount = Number(params.get('amount') || 0);
 
   return {
@@ -34,6 +34,21 @@ function buildFallbackCase(caseId: string): ComplianceCase {
     secondaryContact: '',
     status: 'Unpaid',
     dateCreated
+  };
+}
+
+function enrichCaseFromLink(caseData: ComplianceCase): ComplianceCase {
+  const fallback = buildFallbackCase(caseData.title);
+  return {
+    ...caseData,
+    chargedPersonName: caseData.chargedPersonName || fallback.chargedPersonName,
+    staffEmail: caseData.staffEmail || fallback.staffEmail,
+    department: caseData.department || fallback.department,
+    offenceCategoryName: caseData.offenceCategoryName || fallback.offenceCategoryName,
+    offenceDescription: caseData.offenceDescription || fallback.offenceDescription,
+    penaltyAmount: caseData.penaltyAmount || fallback.penaltyAmount,
+    dueDate: caseData.dueDate || fallback.dueDate,
+    dateCreated: caseData.dateCreated || fallback.dateCreated
   };
 }
 
@@ -66,7 +81,7 @@ export const CaseResponsePage: React.FC = () => {
           return;
         }
 
-        setCaseData(found);
+        setCaseData(enrichCaseFromLink(found));
         setLoading(false);
       } catch (err) {
         console.error('Failed to load case:', err);

@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, COMPLIANCE_EMAIL, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, APPEAL_SLA_DAYS, COMPLIANCE_EMAIL, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -133,7 +133,7 @@ export class SharePointService {
   private buildCaseResponseLink(
     caseRef: string,
     action: 'accept' | 'appeal',
-    opts: { staffName: string; offenceLabel: string; amount: number; dueIso: string }
+    opts: { staffName: string; offenceLabel: string; amount: number; dueIso: string; staffEmail?: string; department?: string; description?: string }
   ): string {
     const params = new URLSearchParams({
       name: opts.staffName,
@@ -142,6 +142,9 @@ export class SharePointService {
       date: opts.dueIso,
       [CASE_RESPONSE_FROM_EMAIL_QUERY_KEY]: CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE,
     });
+    if (opts.staffEmail) params.set('email', opts.staffEmail);
+    if (opts.department) params.set('department', opts.department);
+    if (opts.description) params.set('description', opts.description);
     const hash = `#/case-response/${encodeURIComponent(caseRef)}/${action}?${params.toString()}`;
     const base =
       RESPONSE_PORTAL_BASE_URL.length > 0
@@ -249,7 +252,10 @@ export class SharePointService {
 
     try {
       const response = await fetch(url, { ...options, headers, signal: controller.signal });
-      if (!response.ok) throw new Error(`SharePoint REST error: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`SharePoint REST error ${response.status}: ${response.statusText}${errorText ? ` - ${errorText}` : ''}`);
+      }
 
       const data = await response.json();
       return data.d;
@@ -265,6 +271,101 @@ export class SharePointService {
     });
     const data = await response.json();
     return data.d.GetContextWebInformation.FormDigestValue;
+  }
+
+  private async getListItemEntityType(listName: string): Promise<string> {
+    const data = await this.fetchREST(`web/lists/getbytitle('${listName}')?$select=ListItemEntityTypeFullName`);
+    return data.ListItemEntityTypeFullName;
+  }
+
+  private escapeODataString(value: string): string {
+    return value.replace(/'/g, "''");
+  }
+
+  private formatLookupFieldValue(id: number, display: string): string {
+    return `${id};#${display}`;
+  }
+
+  private async findListItemIdByTitle(listName: string, title: string): Promise<number | null> {
+    const safeTitle = this.escapeODataString(title.trim());
+    if (!safeTitle) return null;
+    const data = await this.fetchREST(
+      `web/lists/getbytitle('${listName}')/items?$filter=Title eq '${safeTitle}'&$select=Id,Title&$top=1`
+    );
+    const item = (data.results || [])[0];
+    const id = item?.ID ?? item?.Id;
+    return typeof id === 'number' ? id : null;
+  }
+
+  private async findStaffDirectoryItem(
+    email?: string,
+    fullName?: string
+  ): Promise<{ id: number; display: string } | null> {
+    const listName = LIST_NAMES.STAFF_DIRECTORY;
+    const trimmedEmail = email?.trim();
+    if (trimmedEmail) {
+      const data = await this.fetchREST(
+        `web/lists/getbytitle('${listName}')/items?$filter=Email eq '${this.escapeODataString(trimmedEmail)}'&$select=Id,Title,Email&$top=1`
+      );
+      const item = (data.results || [])[0];
+      if (item?.ID) {
+        return { id: item.ID, display: item.Title || fullName || trimmedEmail };
+      }
+    }
+    const trimmedName = fullName?.trim();
+    if (trimmedName) {
+      const data = await this.fetchREST(
+        `web/lists/getbytitle('${listName}')/items?$filter=Title eq '${this.escapeODataString(trimmedName)}'&$select=Id,Title&$top=1`
+      );
+      const item = (data.results || [])[0];
+      if (item?.ID) {
+        return { id: item.ID, display: item.Title || trimmedName };
+      }
+    }
+    return null;
+  }
+
+  private async resolveAppealLookupFields(appeal: any): Promise<{
+    caseLookup?: string;
+    appellantLookup?: string;
+  }> {
+    const resolved: { caseLookup?: string; appellantLookup?: string } = {};
+    const caseRef = String(appeal.caseReference || '').trim();
+    if (caseRef) {
+      const caseId = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseRef);
+      if (caseId) {
+        resolved.caseLookup = this.formatLookupFieldValue(caseId, caseRef);
+      }
+    }
+    const staff = await this.findStaffDirectoryItem(appeal.appellantEmail, appeal.appellant);
+    if (staff) {
+      resolved.appellantLookup = this.formatLookupFieldValue(staff.id, staff.display);
+    }
+    return resolved;
+  }
+
+  private async notifyHrOfAppeal(appeal: any, appealRef: string): Promise<void> {
+    const extraRows = [
+      appeal.department ? `<tr><td style="padding:6px 0;color:#666;">Department</td><td>${appeal.department}</td></tr>` : '',
+      appeal.offence ? `<tr><td style="padding:6px 0;color:#666;">Offence</td><td>${appeal.offence}</td></tr>` : '',
+      typeof appeal.penaltyAmount === 'number'
+        ? `<tr><td style="padding:6px 0;color:#666;">Penalty</td><td>₦${appeal.penaltyAmount.toLocaleString()}</td></tr>`
+        : '',
+      appeal.appellantEmail
+        ? `<tr><td style="padding:6px 0;color:#666;">Appellant email</td><td>${appeal.appellantEmail}</td></tr>`
+        : '',
+    ].filter(Boolean).join('');
+    const subject = `PACT APPEAL FILED: Case ${appeal.caseReference} (${appealRef})`;
+    const body = `
+      <div style="font-family:Arial,sans-serif;color:#333;max-width:640px;">
+        <p>An appeal has been submitted by <b>${appeal.appellant}</b> for case <b>${appeal.caseReference}</b>.</p>
+        ${extraRows ? `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">${extraRows}</table>` : ''}
+        <p><b>Grounds for appeal:</b></p>
+        <p style="background:#f8fafc;padding:12px;border-radius:6px;white-space:pre-wrap;">${appeal.grounds || ''}</p>
+        <p style="font-size:13px;color:#666;">Please review in the PACT Appeals Register within ${APPEAL_SLA_DAYS} working days.</p>
+      </div>
+    `;
+    await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL], subject, body);
   }
 
   private async sendEmailNotification(to: string[], subject: string, body: string): Promise<void> {
@@ -450,9 +551,21 @@ export class SharePointService {
       return isNaN(num) ? 0 : num;
     }
 
+  private normalizeFieldValue(value: any): any {
+    if (value && typeof value === 'object') {
+      if ('Title' in value) return value.Title;
+      if ('LookupValue' in value) return value.LookupValue;
+      if ('Email' in value) return value.Email;
+      if ('results' in value && Array.isArray(value.results)) {
+        return value.results.map((entry: any) => this.normalizeFieldValue(entry)).filter(Boolean).join(', ');
+      }
+    }
+    return value;
+  }
+
   private readField(item: any, ...keys: string[]): any {
     for (const key of keys) {
-      const value = item?.[key];
+      const value = this.normalizeFieldValue(item?.[key]);
       if (value !== undefined && value !== null && value !== '') {
         return value;
       }
@@ -730,16 +843,20 @@ export class SharePointService {
             offenceLabel,
             amount: newCase.penaltyAmount,
             dueIso: newCase.dueDate,
+            staffEmail: newCase.staffEmail,
+            department: newCase.department,
+            description: newCase.offenceDescription,
           });
           const appealUrl = this.buildCaseResponseLink(newCase.title, 'appeal', {
             staffName: staffDisplay,
             offenceLabel,
             amount: newCase.penaltyAmount,
             dueIso: newCase.dueDate,
+            staffEmail: newCase.staffEmail,
+            department: newCase.department,
+            description: newCase.offenceDescription,
           });
-          const emailButtonHtml = isEscalated
-            ? this.buildEmailButtonHtmlAppealOnly(appealUrl)
-            : this.buildEmailButtonHtmlBoth(acceptUrl, appealUrl);
+          const emailButtonHtml = this.buildEmailButtonHtmlBoth(acceptUrl, appealUrl);
 
           const payload = {
             ...newCase,
@@ -1109,6 +1226,7 @@ export class SharePointService {
       offenceLabel: 'Escalated compliance matter',
       amount: 0,
       dueIso: new Date().toISOString(),
+      description: entry.escalationReason || '',
     });
     const subject = `PACT ESCALATION: ${entry.caseReference} - TIER UPGRADE`;
     const body = `
@@ -1204,7 +1322,7 @@ export class SharePointService {
           appealDate: this.readField(item, COLUMNS.APPEALS.APPEAL_DATE, 'Appeal Date', 'AppealDate', 'Appeal_x0020_Date'),
           grounds: this.readField(item, COLUMNS.APPEALS.GROUNDS, 'Grounds for Appeal', 'GroundsforAppeal', 'Grounds_x0020_for_x0020_Appeal'),
           reviewingOfficer: this.readField(item, COLUMNS.APPEALS.REVIEWING_OFFICER, 'Reviewing Officer', 'ReviewingOfficer', 'Reviewing_x0020_Officer'),
-          decision: this.readField(item, COLUMNS.APPEALS.DECISION, 'Decision'),
+          decision: this.readField(item, COLUMNS.APPEALS.DECISION, 'Decision') || 'Pending',
           decisionDate: this.readField(item, COLUMNS.APPEALS.DECISION_DATE, 'Decision Date', 'DecisionDate', 'Decision_x0020_Date'),
           decisionNotes: this.readField(item, COLUMNS.APPEALS.DECISION_NOTES, 'Decision Notes', 'DecisionNotes', 'Decision_x0020_Notes')
         }));
@@ -1238,38 +1356,79 @@ export class SharePointService {
 
 
   public async createAppeal(appeal: any): Promise<void> {
+    const title = appeal.title || `A-${String(Date.now()).slice(-4)}`;
+    const appealDate = new Date().toISOString();
+
     if (this.isLocal) {
       const log = this.getFromLocal<any>('pact_appeals');
       log.push({
         id: Date.now().toString(),
-        title: appeal.title || `A-${String(log.length + 1).padStart(3, '0')}`,
-        appealDate: new Date().toISOString(),
+        title,
+        appealDate,
         decision: 'Pending',
         ...appeal
       });
       this.saveToLocal('pact_appeals', log);
     } else {
-      const spData = {
-        '__metadata': { 'type': `SP.Data.${LIST_NAMES.APPEALS_REGISTER.replace(/ /g, '_x0020_')}ListItem` },
-        Title: appeal.title || `A-${String(Date.now()).slice(-4)}`,
-        [COLUMNS.APPEALS.CASE_REFERENCE]: appeal.caseReference,
-        [COLUMNS.APPEALS.APPELLANT]: appeal.appellant,
-        [COLUMNS.APPEALS.APPEAL_DATE]: new Date().toISOString(),
-        [COLUMNS.APPEALS.GROUNDS]: appeal.grounds,
-        [COLUMNS.APPEALS.DECISION]: 'Pending',
-        [COLUMNS.APPEALS.DECISION_NOTES]: appeal.decisionNotes || ''
-      };
-
-      await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
+      const itemType = await this.getListItemEntityType(LIST_NAMES.APPEALS_REGISTER);
+      const lookups = await this.resolveAppealLookupFields(appeal);
+      const created = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
         method: 'POST',
-        body: JSON.stringify(spData)
+        body: JSON.stringify({
+          '__metadata': { 'type': itemType },
+          Title: title
+        })
+      });
+      await this.updateAppealByDisplayNames(created.ID, {
+        title,
+        appealDate,
+        ...appeal,
+        ...lookups
       });
     }
 
-    // Email to HR
-    const subject = `PACT APPEAL FILED: Case ${appeal.caseReference}`;
-    const body = `<p>An appeal has been filed by <b>${appeal.appellant}</b> for Case <b>${appeal.caseReference}</b>.</p><p>Grounds: ${appeal.grounds}</p><p><b>Please review within 3 working days.</b></p>`;
-    await this.sendEmailNotification([HR_EMAIL], subject, body);
+    await this.notifyHrOfAppeal(appeal, title);
+  }
+
+  private async updateAppealByDisplayNames(itemId: number, appeal: any): Promise<void> {
+    const formValues: Array<{ FieldName: string; FieldValue: string }> = [
+      { FieldName: 'Title', FieldValue: appeal.title || '' },
+      { FieldName: 'Appeal Date', FieldValue: appeal.appealDate || new Date().toISOString() },
+      { FieldName: 'Grounds for Appeal', FieldValue: appeal.grounds || '' }
+    ];
+
+    if (appeal.caseReferenceLookup) {
+      formValues.push({ FieldName: 'Case Reference', FieldValue: appeal.caseReferenceLookup });
+    } else if (appeal.caseReference) {
+      formValues.push({ FieldName: 'Case Reference', FieldValue: String(appeal.caseReference) });
+    }
+
+    if (appeal.appellantLookup) {
+      formValues.push({ FieldName: 'Appellant Name', FieldValue: appeal.appellantLookup });
+    } else if (appeal.appellant) {
+      formValues.push({ FieldName: 'Appellant Name', FieldValue: String(appeal.appellant) });
+    }
+
+    if (appeal.decision && appeal.decision !== 'Pending') {
+      formValues.push({ FieldName: 'Decision', FieldValue: appeal.decision });
+    }
+    if (appeal.decisionNotes) {
+      formValues.push({ FieldName: 'Decision Notes', FieldValue: appeal.decisionNotes });
+    }
+
+    await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${itemId})/validateUpdateListItem`, {
+      method: 'POST',
+      body: JSON.stringify({
+        formValues: {
+          '__metadata': { 'type': 'Collection(SP.ListItemFormUpdateValue)' },
+          results: formValues.map(value => ({
+            '__metadata': { 'type': 'SP.ListItemFormUpdateValue' },
+            ...value
+          }))
+        },
+        bNewDocumentUpdate: false
+      })
+    });
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {
@@ -1322,10 +1481,10 @@ export class SharePointService {
       staffEmail: this.readField(item, COLUMNS.CASES.STAFF_EMAIL, 'StaffEmail', 'Email', 'Charged Person Email', 'Staff Email'),
       department: this.readField(item, COLUMNS.CASES.DEPARTMENT, 'Department'),
       offenceCategory: offenceCategoryId,
-      offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category'),
-      offenceDescription: this.readField(item, COLUMNS.CASES.OFFENCE_DESCRIPTION, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description'),
-      penaltyAmount: this.parsePenalty(this.readField(item, COLUMNS.CASES.PENALTY_AMOUNT, 'PenaltyAmount')),
-      dueDate: this.readField(item, COLUMNS.CASES.DUE_DATE, 'DueDate', 'Due Date', 'Due_x0020_Date'),
+      offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category', 'Offence'),
+      offenceDescription: this.readField(item, COLUMNS.CASES.OFFENCE_DESCRIPTION, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description'),
+      penaltyAmount: this.parsePenalty(this.readField(item, COLUMNS.CASES.PENALTY_AMOUNT, 'PenaltyAmount', 'Penalty Amount', 'Penalty', 'Amount', 'Penalty_x0020_Amount')),
+      dueDate: this.readField(item, COLUMNS.CASES.DUE_DATE, 'DueDate', 'Due Date', 'Due_x0020_Date', 'Payment Due Date'),
       issuerName: this.readField(item, COLUMNS.CASES.ISSUER_NAME, 'IssuerName', 'Issuer Name', 'Issuer_x0020_Name'),
       secondaryContact: this.readField(item, COLUMNS.CASES.SECONDARY_CONTACT, 'SecondaryContact', 'Secondary Contact Email'),
       status: this.readField(item, COLUMNS.CASES.STATUS, 'Status'),

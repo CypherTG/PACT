@@ -39,6 +39,11 @@ export const AppealSubmissionPage: React.FC<Props> = ({ caseData }) => {
       await sharePointService.createAppeal({
         caseReference: caseData.title,
         appellant: caseData.chargedPersonName,
+        appellantEmail: caseData.staffEmail,
+        department: caseData.department,
+        offence: caseData.offenceCategoryName,
+        offenceDescription: caseData.offenceDescription,
+        penaltyAmount: caseData.penaltyAmount,
         grounds: grounds.trim(),
       });
       setSubmitted(true);
