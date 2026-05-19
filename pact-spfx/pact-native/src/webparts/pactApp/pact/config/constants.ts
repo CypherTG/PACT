@@ -24,6 +24,9 @@ export const CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE = 'email';
 // ─── SharePoint Site ────────────────────────────────────────────────────────
 export const SHAREPOINT_SITE_URL = 'netorgft13110820.sharepoint.com';
 export const SHAREPOINT_SITE_PATH = '/sites/KONSTRUCTUM';
+
+/** Site-relative document library for payment proof uploads (syncs via OneDrive). */
+export const PAYMENT_PROOFS_LIBRARY = 'PACT Payment Proofs';
 export const SHAREPOINT_SITE_ID = ''; // Will be resolved at runtime via Graph
 
 // ─── SharePoint List Names ──────────────────────────────────────────────────

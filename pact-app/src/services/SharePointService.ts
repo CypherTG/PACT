@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, APPEAL_SLA_DAYS, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, APPEAL_SLA_DAYS, PAYMENT_PROOFS_LIBRARY, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -231,7 +231,7 @@ export class SharePointService {
     const timeout = window.setTimeout(() => controller.abort(), this.REST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(url, { ...options, headers, signal: controller.signal });
+      const response = await fetch(url, { ...options, headers, signal: controller.signal, credentials: 'include' });
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         throw new Error(`SharePoint REST error ${response.status}: ${response.statusText}${errorText ? ` - ${errorText}` : ''}`);
@@ -247,7 +247,8 @@ export class SharePointService {
   private async getFormDigest(): Promise<string> {
     const response = await fetch(`${this.siteUrl}/_api/contextinfo`, {
       method: 'POST',
-      headers: { 'Accept': 'application/json;odata=verbose' }
+      headers: { 'Accept': 'application/json;odata=verbose' },
+      credentials: 'include'
     });
     const data = await response.json();
     return data.d.GetContextWebInformation.FormDigestValue;
@@ -306,22 +307,182 @@ export class SharePointService {
   }
 
   private async resolveAppealLookupFields(appeal: any): Promise<{
+    caseId?: number;
+    appellantId?: number;
     caseLookup?: string;
     appellantLookup?: string;
   }> {
-    const resolved: { caseLookup?: string; appellantLookup?: string } = {};
+    const resolved: {
+      caseId?: number;
+      appellantId?: number;
+      caseLookup?: string;
+      appellantLookup?: string;
+    } = {};
     const caseRef = String(appeal.caseReference || '').trim();
     if (caseRef) {
       const caseId = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseRef);
       if (caseId) {
+        resolved.caseId = caseId;
         resolved.caseLookup = this.formatLookupFieldValue(caseId, caseRef);
       }
     }
     const staff = await this.findStaffDirectoryItem(appeal.appellantEmail, appeal.appellant);
     if (staff) {
+      resolved.appellantId = staff.id;
       resolved.appellantLookup = this.formatLookupFieldValue(staff.id, staff.display);
     }
     return resolved;
+  }
+
+  private assertValidateUpdateSucceeded(result: any): void {
+    const values = result?.results || [];
+    const failures = values.filter(
+      (entry: any) => entry?.HasException || (entry?.ErrorMessage && String(entry.ErrorMessage).trim())
+    );
+    if (failures.length > 0) {
+      const messages = failures
+        .map((entry: any) => String(entry.ErrorMessage || entry.FieldName || 'Unknown field'))
+        .join('; ');
+      throw new Error(`Appeals Register update rejected: ${messages}`);
+    }
+  }
+
+  private async notifyPowerAutomate(payload: Record<string, unknown>): Promise<void> {
+    if (!POWER_AUTOMATE_URL) return;
+    try {
+      const response = await fetch(POWER_AUTOMATE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        console.warn('Power Automate notification returned', response.status);
+      }
+    } catch (error) {
+      console.warn('Power Automate notification failed:', error);
+    }
+  }
+
+  private getPaymentProofsFolderPath(): string {
+    return `${SHAREPOINT_SITE_PATH}/${PAYMENT_PROOFS_LIBRARY}`;
+  }
+
+  private sanitizeFileName(name: string): string {
+    return name.replace(/[\\/:*?"<>|#%]/g, '_').replace(/\s+/g, '_');
+  }
+
+  private escapeSharePointPath(path: string): string {
+    return path.replace(/'/g, "''");
+  }
+
+  private async ensurePaymentProofsLibrary(): Promise<void> {
+    if (this.isLocal) return;
+    const folderPath = this.getPaymentProofsFolderPath();
+    try {
+      await this.fetchREST(
+        `web/GetFolderByServerRelativeUrl('${this.escapeSharePointPath(folderPath)}')`
+      );
+    } catch {
+      await this.fetchREST('web/folders', {
+        method: 'POST',
+        body: JSON.stringify({
+          __metadata: { type: 'SP.Folder' },
+          ServerRelativeUrl: folderPath
+        })
+      });
+    }
+  }
+
+  private async uploadPaymentProofFile(caseReference: string, file: File): Promise<string> {
+    if (this.isLocal) {
+      return `local://${this.sanitizeFileName(caseReference)}_${this.sanitizeFileName(file.name)}`;
+    }
+
+    await this.ensurePaymentProofsLibrary();
+    const folderPath = this.getPaymentProofsFolderPath();
+    const fileName = `${this.sanitizeFileName(caseReference)}_${Date.now()}_${this.sanitizeFileName(file.name)}`;
+    const digest = await this.getFormDigest();
+    const endpoint = `${this.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${this.escapeSharePointPath(folderPath)}')/Files/add(url='${fileName.replace(/'/g, "''")}',overwrite=true)`;
+    const buffer = await file.arrayBuffer();
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json;odata=verbose',
+        'X-RequestDigest': digest
+      },
+      credentials: 'include',
+      body: buffer
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Payment proof upload failed (${response.status}): ${errorText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    const serverRelativeUrl = data?.d?.ServerRelativeUrl || `${folderPath}/${fileName}`;
+    return `${this.siteUrl}${serverRelativeUrl.startsWith('/') ? '' : '/'}${serverRelativeUrl}`.replace(/([^:]\/)\/+/g, '$1');
+  }
+
+  public async submitPaymentAcceptance(
+    caseData: ComplianceCase,
+    proofFile: File,
+    paymentNotes?: string
+  ): Promise<{ proofUrl: string }> {
+    const proofUrl = await this.uploadPaymentProofFile(caseData.title, proofFile);
+
+    if (this.isLocal) {
+      const cases = this.getFromLocal<ComplianceCase>('pact_cases');
+      const idx = cases.findIndex(c => c.title === caseData.title || c.id === caseData.id);
+      if (idx > -1) {
+        cases[idx] = { ...cases[idx], status: 'Paid', evidence: proofUrl };
+        this.saveToLocal('pact_cases', cases);
+      }
+    } else {
+      let caseItemId = caseData.id !== 'fallback' ? Number(caseData.id) : NaN;
+      if (!Number.isFinite(caseItemId)) {
+        const resolved = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseData.title);
+        if (resolved) caseItemId = resolved;
+      }
+      if (Number.isFinite(caseItemId)) {
+        const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
+        const patch: Record<string, unknown> = {
+          __metadata: { type: itemType },
+          [COLUMNS.CASES.STATUS]: 'Paid',
+          [COLUMNS.CASES.EVIDENCE]: proofUrl
+        };
+        await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items(${caseItemId})`, {
+          method: 'POST',
+          headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+          body: JSON.stringify(patch)
+        });
+      }
+    }
+
+    const subject = `PACT PAYMENT PROOF: ${caseData.title} — ${caseData.chargedPersonName}`;
+    const emailBody = `
+      <div style="font-family:Arial,sans-serif;">
+        <p><b>${caseData.chargedPersonName}</b> submitted proof of payment for case <b>${caseData.title}</b>.</p>
+        <p><b>Amount:</b> ₦${caseData.penaltyAmount.toLocaleString()}</p>
+        ${paymentNotes ? `<p><b>Employee notes:</b> ${paymentNotes}</p>` : ''}
+        <p><a href="${proofUrl}">Open payment proof</a> (${PAYMENT_PROOFS_LIBRARY})</p>
+      </div>
+    `;
+    await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL], subject, emailBody);
+
+    await this.notifyPowerAutomate({
+      eventType: 'payment_proof_submitted',
+      caseReference: caseData.title,
+      chargedPersonName: caseData.chargedPersonName,
+      staffEmail: caseData.staffEmail,
+      penaltyAmount: caseData.penaltyAmount,
+      proofUrl,
+      paymentNotes: paymentNotes || '',
+      proofFileName: proofFile.name
+    });
+
+    return { proofUrl };
   }
 
   private async notifyHrOfAppeal(appeal: any, appealRef: string): Promise<void> {
@@ -1239,18 +1400,43 @@ export class SharePointService {
     } else {
       const itemType = await this.getListItemEntityType(LIST_NAMES.APPEALS_REGISTER);
       const lookups = await this.resolveAppealLookupFields(appeal);
-      const created = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
-        method: 'POST',
-        body: JSON.stringify({
-          '__metadata': { 'type': itemType },
-          Title: title
-        })
-      });
-      await this.updateAppealByDisplayNames(created.ID, {
-        title,
-        appealDate,
-        ...appeal,
-        ...lookups
+      let itemId: number;
+
+      const spData: Record<string, unknown> = {
+        __metadata: { type: itemType },
+        Title: title,
+        [COLUMNS.APPEALS.GROUNDS]: appeal.grounds,
+        [COLUMNS.APPEALS.APPEAL_DATE]: appealDate
+      };
+      if (lookups.caseId) {
+        spData[`${COLUMNS.APPEALS.CASE_REFERENCE}Id`] = lookups.caseId;
+      }
+      if (lookups.appellantId) {
+        spData[`${COLUMNS.APPEALS.APPELLANT}Id`] = lookups.appellantId;
+        spData.Appellant_x0020_NameId = lookups.appellantId;
+      }
+
+      try {
+        const created = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
+          method: 'POST',
+          body: JSON.stringify(spData)
+        });
+        itemId = created.ID;
+      } catch (primaryError) {
+        console.warn('Appeals Register direct create failed; using validateUpdateListItem.', primaryError);
+        const created = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
+          method: 'POST',
+          body: JSON.stringify({ __metadata: { type: itemType }, Title: title })
+        });
+        itemId = created.ID;
+        await this.updateAppealByDisplayNames(itemId, { title, appealDate, ...appeal, ...lookups });
+      }
+
+      await this.notifyPowerAutomate({
+        eventType: 'appeal_submitted',
+        appealRef: title,
+        sharePointItemId: itemId,
+        ...appeal
       });
     }
 
@@ -1283,19 +1469,23 @@ export class SharePointService {
       formValues.push({ FieldName: 'Decision Notes', FieldValue: appeal.decisionNotes });
     }
 
-    await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${itemId})/validateUpdateListItem`, {
-      method: 'POST',
-      body: JSON.stringify({
-        formValues: {
-          '__metadata': { 'type': 'Collection(SP.ListItemFormUpdateValue)' },
-          results: formValues.map(value => ({
-            '__metadata': { 'type': 'SP.ListItemFormUpdateValue' },
-            ...value
-          }))
-        },
-        bNewDocumentUpdate: false
-      })
-    });
+    const result = await this.fetchREST(
+      `web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${itemId})/validateUpdateListItem`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          formValues: {
+            __metadata: { type: 'Collection(SP.ListItemFormUpdateValue)' },
+            results: formValues.map(value => ({
+              __metadata: { type: 'SP.ListItemFormUpdateValue' },
+              ...value
+            }))
+          },
+          bNewDocumentUpdate: false
+        })
+      }
+    );
+    this.assertValidateUpdateSucceeded(result);
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {

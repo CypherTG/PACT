@@ -9,7 +9,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $logPath = Join-Path $projectRoot 'temp\pact-gulp-serve.log'
 $port = 4321
 $tenantWorkbenchUrl = 'https://netorgft13110820.sharepoint.com/sites/KONSTRUCTUM/_layouts/15/workbench.aspx'
-$debugManifestsUrl = "http://localhost:$port/temp/build/manifests.js"
+$debugManifestsUrl = "https://localhost:$port/temp/build/manifests.js"
 $launchWorkbenchUrl = "${tenantWorkbenchUrl}?loadSPFX=true&debugManifestsFile=${debugManifestsUrl}"
 $certFriendlyName = 'PACT SPFx Dev Cert'
 
@@ -241,14 +241,7 @@ function Rewrite-DebugManifests {
     return
   }
 
-  $content = [IO.File]::ReadAllText($manifestPath)
-  $updated = $content.Replace('https://localhost:4321/', 'http://localhost:4321/')
-  $updated = $updated.Replace('https://localhost:54321/', 'http://localhost:54321/')
-
-  if ($updated -ne $content) {
-    [IO.File]::WriteAllText($manifestPath, $updated, [System.Text.Encoding]::UTF8)
-    Write-Log "Rewrote manifest URLs to use http for local assets."
-  }
+  # Keep https://localhost URLs so SharePoint (https) workbench can load manifests without scripterror.
 }
 
 function Rewrite-PactBundle {

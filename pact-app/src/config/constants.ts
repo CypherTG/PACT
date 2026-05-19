@@ -31,6 +31,9 @@ export const SHAREPOINT_SITE_URL = 'netorgft13110820.sharepoint.com';
 export const SHAREPOINT_SITE_PATH = '/sites/KONSTRUCTUM';
 export const SHAREPOINT_SITE_ID = ''; // Will be resolved at runtime via Graph
 
+/** Site-relative document library for payment proof uploads (syncs via OneDrive). */
+export const PAYMENT_PROOFS_LIBRARY = 'PACT Payment Proofs';
+
 // ─── SharePoint List Names ──────────────────────────────────────────────────
 export const LIST_NAMES = {
   COMPLIANCE_CASES: 'PACT Compliance Cases',

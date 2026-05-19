@@ -47,6 +47,7 @@ export const AppealSubmissionPage: React.FC<Props> = ({ caseData }) => {
         grounds: grounds.trim(),
       });
       setSubmitted(true);
+      setSubmitting(false);
     } catch (err) {
       console.error('Appeal submission failed:', err);
       setError('Failed to submit your appeal. Please try again or contact HR directly.');
