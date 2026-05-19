@@ -64,11 +64,14 @@ export const COLUMNS = {
     SECONDARY_CONTACT: 'Secondary_x0020_Contact_x0020_Email', 
     STATUS: 'Status',
     DATE_CREATED: 'DateCreated', 
+    /** Optional on site — use display-name update if column exists */
     EVIDENCE: 'Evidence',
+    PAYMENT_PROOF: 'Payment_x0020_Proof',
   },
   STAFF: {
-    TITLE: 'Title', 
-    EMAIL: 'Email',
+    TITLE: 'Title',
+    /** Display name: Email Address */
+    EMAIL: 'Email_x0020_Address',
     DEPARTMENT: 'Department',
     ROLE: 'Role',
     LINE_MANAGER: 'Line_x0020_Manager',

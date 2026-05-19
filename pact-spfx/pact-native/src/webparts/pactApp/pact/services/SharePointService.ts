@@ -284,23 +284,42 @@ export class SharePointService {
   ): Promise<{ id: number; display: string } | null> {
     const listName = LIST_NAMES.STAFF_DIRECTORY;
     const trimmedEmail = email?.trim();
+    const emailFieldCandidates = [
+      COLUMNS.STAFF.EMAIL,
+      'Email_x0020_Address',
+      'Staff_x0020_Email',
+      'WorkEmail',
+      'EMail'
+    ];
+
     if (trimmedEmail) {
-      const data = await this.fetchREST(
-        `web/lists/getbytitle('${listName}')/items?$filter=Email eq '${this.escapeODataString(trimmedEmail)}'&$select=Id,Title,Email&$top=1`
-      );
-      const item = (data.results || [])[0];
-      if (item?.ID) {
-        return { id: item.ID, display: item.Title || fullName || trimmedEmail };
+      for (const field of emailFieldCandidates) {
+        try {
+          const data = await this.fetchREST(
+            `web/lists/getbytitle('${listName}')/items?$filter=${field} eq '${this.escapeODataString(trimmedEmail)}'&$select=Id,Title&$top=1`
+          );
+          const item = (data.results || [])[0];
+          if (item?.ID) {
+            return { id: item.ID, display: item.Title || fullName || trimmedEmail };
+          }
+        } catch {
+          // Column internal name differs per site — try next candidate.
+        }
       }
     }
+
     const trimmedName = fullName?.trim();
     if (trimmedName) {
-      const data = await this.fetchREST(
-        `web/lists/getbytitle('${listName}')/items?$filter=Title eq '${this.escapeODataString(trimmedName)}'&$select=Id,Title&$top=1`
-      );
-      const item = (data.results || [])[0];
-      if (item?.ID) {
-        return { id: item.ID, display: item.Title || trimmedName };
+      try {
+        const data = await this.fetchREST(
+          `web/lists/getbytitle('${listName}')/items?$filter=Title eq '${this.escapeODataString(trimmedName)}'&$select=Id,Title&$top=1`
+        );
+        const item = (data.results || [])[0];
+        if (item?.ID) {
+          return { id: item.ID, display: item.Title || trimmedName };
+        }
+      } catch {
+        console.warn('Staff directory lookup by name failed for', trimmedName);
       }
     }
     return null;
@@ -320,10 +339,14 @@ export class SharePointService {
     } = {};
     const caseRef = String(appeal.caseReference || '').trim();
     if (caseRef) {
-      const caseId = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseRef);
-      if (caseId) {
-        resolved.caseId = caseId;
-        resolved.caseLookup = this.formatLookupFieldValue(caseId, caseRef);
+      try {
+        const caseId = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseRef);
+        if (caseId) {
+          resolved.caseId = caseId;
+          resolved.caseLookup = this.formatLookupFieldValue(caseId, caseRef);
+        }
+      } catch {
+        console.warn('Case lookup failed for appeal reference', caseRef);
       }
     }
     const staff = await this.findStaffDirectoryItem(appeal.appellantEmail, appeal.appellant);
@@ -446,17 +469,24 @@ export class SharePointService {
         if (resolved) caseItemId = resolved;
       }
       if (Number.isFinite(caseItemId)) {
-        const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
-        const patch: Record<string, unknown> = {
-          __metadata: { type: itemType },
-          [COLUMNS.CASES.STATUS]: 'Paid',
-          [COLUMNS.CASES.EVIDENCE]: proofUrl
-        };
-        await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items(${caseItemId})`, {
-          method: 'POST',
-          headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-          body: JSON.stringify(patch)
-        });
+        await this.updateListItemByDisplayNames(LIST_NAMES.COMPLIANCE_CASES, caseItemId, [
+          { FieldName: 'Status', FieldValue: 'Paid' }
+        ]);
+        const proofLinkValue = `${proofUrl}, Payment proof`;
+        const proofFieldDisplayNames = [
+          'Evidence',
+          'Payment Proof',
+          'Payment Proof URL',
+          'Proof of Payment'
+        ];
+        for (const fieldName of proofFieldDisplayNames) {
+          const saved = await this.tryUpdateListItemByDisplayNames(
+            LIST_NAMES.COMPLIANCE_CASES,
+            caseItemId,
+            [{ FieldName: fieldName, FieldValue: proofLinkValue }]
+          );
+          if (saved) break;
+        }
       }
     }
 
@@ -1443,6 +1473,44 @@ export class SharePointService {
     await this.notifyHrOfAppeal(appeal, title);
   }
 
+  private async updateListItemByDisplayNames(
+    listName: string,
+    itemId: number,
+    formValues: Array<{ FieldName: string; FieldValue: string }>
+  ): Promise<void> {
+    if (formValues.length === 0) return;
+    const result = await this.fetchREST(
+      `web/lists/getbytitle('${listName}')/items(${itemId})/validateUpdateListItem`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          formValues: {
+            __metadata: { type: 'Collection(SP.ListItemFormUpdateValue)' },
+            results: formValues.map(value => ({
+              __metadata: { type: 'SP.ListItemFormUpdateValue' },
+              ...value
+            }))
+          },
+          bNewDocumentUpdate: false
+        })
+      }
+    );
+    this.assertValidateUpdateSucceeded(result);
+  }
+
+  private async tryUpdateListItemByDisplayNames(
+    listName: string,
+    itemId: number,
+    formValues: Array<{ FieldName: string; FieldValue: string }>
+  ): Promise<boolean> {
+    try {
+      await this.updateListItemByDisplayNames(listName, itemId, formValues);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async updateAppealByDisplayNames(itemId: number, appeal: any): Promise<void> {
     const formValues: Array<{ FieldName: string; FieldValue: string }> = [
       { FieldName: 'Title', FieldValue: appeal.title || '' },
@@ -1469,23 +1537,7 @@ export class SharePointService {
       formValues.push({ FieldName: 'Decision Notes', FieldValue: appeal.decisionNotes });
     }
 
-    const result = await this.fetchREST(
-      `web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${itemId})/validateUpdateListItem`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          formValues: {
-            __metadata: { type: 'Collection(SP.ListItemFormUpdateValue)' },
-            results: formValues.map(value => ({
-              __metadata: { type: 'SP.ListItemFormUpdateValue' },
-              ...value
-            }))
-          },
-          bNewDocumentUpdate: false
-        })
-      }
-    );
-    this.assertValidateUpdateSucceeded(result);
+    await this.updateListItemByDisplayNames(LIST_NAMES.APPEALS_REGISTER, itemId, formValues);
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {
