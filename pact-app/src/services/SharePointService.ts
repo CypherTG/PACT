@@ -357,8 +357,15 @@ export class SharePointService {
     return resolved;
   }
 
-  private assertValidateUpdateSucceeded(result: any): void {
-    const values = result?.results || [];
+  private normalizeValidateUpdateResults(result: any): any[] {
+    if (Array.isArray(result)) return result;
+    if (Array.isArray(result?.value)) return result.value;
+    if (Array.isArray(result?.results)) return result.results;
+    return [];
+  }
+
+  private assertValidateUpdateSucceeded(result: any, context = 'List item'): void {
+    const values = this.normalizeValidateUpdateResults(result);
     const failures = values.filter(
       (entry: any) => entry?.HasException || (entry?.ErrorMessage && String(entry.ErrorMessage).trim())
     );
@@ -366,7 +373,7 @@ export class SharePointService {
       const messages = failures
         .map((entry: any) => String(entry.ErrorMessage || entry.FieldName || 'Unknown field'))
         .join('; ');
-      throw new Error(`Appeals Register update rejected: ${messages}`);
+      throw new Error(`${context} update rejected: ${messages}`);
     }
   }
 
@@ -1476,7 +1483,8 @@ export class SharePointService {
   private async updateListItemByDisplayNames(
     listName: string,
     itemId: number,
-    formValues: Array<{ FieldName: string; FieldValue: string }>
+    formValues: Array<{ FieldName: string; FieldValue: string }>,
+    options?: { bNewDocumentUpdate?: boolean }
   ): Promise<void> {
     if (formValues.length === 0) return;
     const result = await this.fetchREST(
@@ -1484,27 +1492,25 @@ export class SharePointService {
       {
         method: 'POST',
         body: JSON.stringify({
-          formValues: {
-            __metadata: { type: 'Collection(SP.ListItemFormUpdateValue)' },
-            results: formValues.map(value => ({
-              __metadata: { type: 'SP.ListItemFormUpdateValue' },
-              ...value
-            }))
-          },
-          bNewDocumentUpdate: false
+          formValues: formValues.map(({ FieldName, FieldValue }) => ({
+            FieldName,
+            FieldValue
+          })),
+          bNewDocumentUpdate: options?.bNewDocumentUpdate ?? false
         })
       }
     );
-    this.assertValidateUpdateSucceeded(result);
+    this.assertValidateUpdateSucceeded(result, listName);
   }
 
   private async tryUpdateListItemByDisplayNames(
     listName: string,
     itemId: number,
-    formValues: Array<{ FieldName: string; FieldValue: string }>
+    formValues: Array<{ FieldName: string; FieldValue: string }>,
+    options?: { bNewDocumentUpdate?: boolean }
   ): Promise<boolean> {
     try {
-      await this.updateListItemByDisplayNames(listName, itemId, formValues);
+      await this.updateListItemByDisplayNames(listName, itemId, formValues, options);
       return true;
     } catch {
       return false;
@@ -1537,7 +1543,9 @@ export class SharePointService {
       formValues.push({ FieldName: 'Decision Notes', FieldValue: appeal.decisionNotes });
     }
 
-    await this.updateListItemByDisplayNames(LIST_NAMES.APPEALS_REGISTER, itemId, formValues);
+    await this.updateListItemByDisplayNames(LIST_NAMES.APPEALS_REGISTER, itemId, formValues, {
+      bNewDocumentUpdate: true
+    });
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {
