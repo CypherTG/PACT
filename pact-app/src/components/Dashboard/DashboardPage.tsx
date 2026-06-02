@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import { 
   Users, 
   AlertTriangle, 
   ShieldAlert, 
-  TrendingUp
+  TrendingUp,
+  Plus
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -70,6 +72,13 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="dashboard-container fade-in" data-testid="dashboard-page">
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <h2 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>Compliance Dashboard</h2>
+        <NavLink to="/cases/new" className="btn btn-primary" data-testid="dashboard-new-case-button">
+          <Plus size={16} /> Log New Case
+        </NavLink>
+      </div>
+
       {/* Top KPI Summary Cards */}
       <div className="kpi-grid">
         <div className="kpi-card glass-panel">

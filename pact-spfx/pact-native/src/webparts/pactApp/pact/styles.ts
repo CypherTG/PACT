@@ -9,7 +9,7 @@ const CSS = `
   --bg-surface-hover: #f3f4f6;
   --bg-card: rgba(255, 255, 255, 0.95);
   --primary: #dc2626;
-  --primary-hover: #ef4444;
+  --primary-hover: #b91c1c;
   --secondary: #6b7280;
   --text-primary: var(--bodyText, #111827);
   --text-secondary: var(--bodyText, #4b5563);
