@@ -1825,24 +1825,14 @@ export class SharePointService {
     const subject = `PACT APPEAL FILED: Case ${enrichedAppeal.caseReference} (${title})`;
     const body = this.buildAppealSubmittedEmailBody(enrichedAppeal, title, appealDate);
 
-    await this.postHttpTrigger(APPEAL_MAIL_TRIGGER_URL, {
-      eventType: 'appeal_submitted',
-      appealReference: title,
-      caseReference: enrichedAppeal.caseReference,
-      appellant: enrichedAppeal.appellant,
-      appellantEmail: enrichedAppeal.appellantEmail,
-      department: enrichedAppeal.department,
-      offence: enrichedAppeal.offence,
-      offenceDescription: enrichedAppeal.offenceDescription,
-      penaltyAmount: enrichedAppeal.penaltyAmount,
-      grounds: enrichedAppeal.grounds,
-      appealDate,
-      reviewingOfficer: 'Admin / Executive Review',
-      decision: 'Pending',
-      to: [HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL],
+    // Send appeal notification via the same {to, subject, body} schema
+    // that the working case-logging flow uses — avoids payload mismatch with Power Automate.
+    await this.sendEmailNotification(
+      [HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL],
       subject,
-      body
-    });
+      body,
+      APPEAL_MAIL_TRIGGER_URL
+    );
 
     const log = this.getFromLocal<any>('pact_appeals');
     log.push({
