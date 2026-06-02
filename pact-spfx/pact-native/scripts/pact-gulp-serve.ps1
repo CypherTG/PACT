@@ -9,7 +9,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $logPath = Join-Path $projectRoot 'temp\pact-gulp-serve.log'
 $port = 4321
 $tenantWorkbenchUrl = 'https://netorgft13110820.sharepoint.com/sites/KONSTRUCTUM/_layouts/15/workbench.aspx'
-$debugManifestsUrl = "https://localhost:$port/temp/build/manifests.js"
+$debugManifestsUrl = "https://localhost:$port/temp/manifests.js"
 $launchWorkbenchUrl = "${tenantWorkbenchUrl}?loadSPFX=true&debugManifestsFile=${debugManifestsUrl}"
 $certFriendlyName = 'PACT SPFx Dev Cert'
 
@@ -236,12 +236,14 @@ function Sync-DebugAssets {
 }
 
 function Rewrite-DebugManifests {
-  $manifestPath = Join-Path $projectRoot 'temp\build\manifests.js'
+  $manifestPath = Join-Path $projectRoot 'temp\manifests.js'
   if (-not (Test-Path $manifestPath)) {
     return
   }
 
-  # Keep https://localhost URLs so SharePoint (https) workbench can load manifests without scripterror.
+  $content = [System.IO.File]::ReadAllText($manifestPath)
+  $content = $content.Replace("'/temp/build/manifests.js'", "`"https://localhost:$port/temp/build/manifests.js`"")
+  [System.IO.File]::WriteAllText($manifestPath, $content)
 }
 
 function Rewrite-PactBundle {
@@ -273,13 +275,22 @@ function Rewrite-PactBundle {
 
 function Handle-Client {
   param(
-    [System.Net.Sockets.TcpClient]$Client
+    [System.Net.Sockets.TcpClient]$Client,
+    [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
   )
 
   $stream = $null
   try {
     $networkStream = $Client.GetStream()
-    $stream = $networkStream
+    $sslStream = New-Object System.Net.Security.SslStream($networkStream, $false)
+    try {
+      $sslStream.AuthenticateAsServer($Certificate, $false, [System.Security.Authentication.SslProtocols]::Tls12, $false)
+    } catch {
+      Write-Log "TLS handshake failed: $($_.Exception.Message)"
+      $sslStream.Dispose()
+      return
+    }
+    $stream = $sslStream
 
     $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::ASCII)
     $requestLine = $reader.ReadLine()
@@ -379,16 +390,22 @@ function Handle-Client {
 try {
   Sync-DebugAssets
   Rewrite-DebugManifests
+
+  # Generate or reuse a self-signed TLS certificate for localhost
+  Write-Host 'Generating self-signed TLS certificate for localhost...'
+  $tlsCert = New-LocalDevCert
+  Write-Host "TLS certificate ready (thumbprint: $($tlsCert.Thumbprint))"
+
   $listener = [System.Net.Sockets.TcpListener]::Create($port)
   $listener.Start()
-  Write-Log "Listening on http://127.0.0.1:$port/"
-  Write-Host "PACT SPFx server listening on http://127.0.0.1:$port/"
+  Write-Log "Listening on https://localhost:$port/"
+  Write-Host "PACT SPFx server listening on https://localhost:$port/"
   Write-Host "Redirecting root requests to SharePoint workbench."
   Write-Host "Workbench URL: $launchWorkbenchUrl"
 
   while ($true) {
     $client = $listener.AcceptTcpClient()
-    Handle-Client -Client $client
+    Handle-Client -Client $client -Certificate $tlsCert
   }
 } catch {
   Write-Log "Startup failed: $($_.Exception.Message)"

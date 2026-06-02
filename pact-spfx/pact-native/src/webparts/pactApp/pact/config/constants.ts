@@ -3,31 +3,49 @@
  * Central configuration for SharePoint site, list names, and column internal names
  */
 
+import { readViteEnv } from './env';
+
 // ─── Organisation Email Addresses ───────────────────────────────────────────
 export const HR_EMAIL = 'mbello@konstructum.com'; // HR Department
 export const LEGAL_EMAIL = 'legal@konstructum.com'; // Legal Department
 export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeholder)
+export const CHAIRMAN_EMAIL = readViteEnv('VITE_CHAIRMAN_EMAIL').trim() || 'mbello@konstructum.com'; // Chairman
+export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a2651047ffd44146a15bdcb3d0fc110b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MQClT4tptDeXdC7H3K4gcUmn0g1yb7YxzjJxYhBAtZA'; // HTTP Flow Webhook URL
+export const ACCEPT_PAYMENT_TRIGGER_URL = readViteEnv('VITE_ACCEPT_PAYMENT_TRIGGER_URL').trim() || MAIL_TRIGGER_URL; // Accept/payment HTTP Flow URL
+export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/355bb22182fe466cb4f33218b62ee1ca/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bbOk-FnU8nwVdLhol2InFt7zzIHbliF8TyH1cSCxaHQ'; // Appeal HTTP Flow Webhook URL
 export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
 export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
 
-/**
- * Employee case-response one-pager (e.g. Vercel). Same hash routes as pact-app.
- * Example: `https://your-deployment.vercel.app`
- * Leave empty to build links from the current SharePoint page URL.
- */
-export const RESPONSE_PORTAL_BASE_URL = '';
+/** Values for PACT Compliance Cases → Status (add matching choices in SharePoint). */
+export const CASE_STATUS = {
+  UNPAID: 'Unpaid',
+  PAID: 'Paid',
+  OVERDUE: 'Overdue',
+  WAIVED: 'Waived',
+  APPEAL_PENDING: 'Appeal Pending',
+} as const;
 
-/** Accept / Appeal: must match query on links from notices (blocks direct typing / bookmarks). */
+/**
+ * Employee case-response one-pager (e.g. Vercel). Routes use HashRouter:
+ * `/#/case-response/:caseRef/:action?...`
+ * Set in `.env`: `VITE_RESPONSE_PORTAL_URL=https://your-app.vercel.app`
+ * Leave empty to use the current page origin (SharePoint or local dev).
+ */
+export const RESPONSE_PORTAL_BASE_URL = readViteEnv('VITE_RESPONSE_PORTAL_URL').trim().replace(/\/$/, '');
+
+/**
+ * Accept / Appeal flows are gated: valid only when the URL includes this query (added to every email button link).
+ */
 export const CASE_RESPONSE_FROM_EMAIL_QUERY_KEY = 'pact_src';
 export const CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE = 'email';
 
 // ─── SharePoint Site ────────────────────────────────────────────────────────
 export const SHAREPOINT_SITE_URL = 'netorgft13110820.sharepoint.com';
 export const SHAREPOINT_SITE_PATH = '/sites/KONSTRUCTUM';
+export const SHAREPOINT_SITE_ID = ''; // Will be resolved at runtime via Graph
 
 /** Site-relative document library for payment proof uploads (syncs via OneDrive). */
 export const PAYMENT_PROOFS_LIBRARY = 'PACT Payment Proofs';
-export const SHAREPOINT_SITE_ID = ''; // Will be resolved at runtime via Graph
 
 // ─── SharePoint List Names ──────────────────────────────────────────────────
 export const LIST_NAMES = {
@@ -44,11 +62,11 @@ export const LIST_NAMES = {
 // ─── Internal Column Names (SharePoint internal names) ──────────────────────
 // Note: SharePoint stores internal names on column creation.
 // Renaming a column only changes the display name.
-// Documented typo: 'ChargedPersaon' is the internal name for 'Charged Person'
+// Internal names match the column's SharePoint internal name at creation time.
 export const COLUMNS = {
   CASES: {
     TITLE: 'Title',
-    CHARGED_PERSON: 'ChargedPersaon', 
+    CHARGED_PERSON: 'ChargedPerson', 
     STAFF_EMAIL: 'Charged_x0020_Person_x0020_Email',
     DEPARTMENT: 'Department',
     OFFENCE_CATEGORY: 'Offence_x0020_Category', 
@@ -59,11 +77,13 @@ export const COLUMNS = {
     SECONDARY_CONTACT: 'Secondary_x0020_Contact_x0020_Email', 
     STATUS: 'Status',
     DATE_CREATED: 'DateCreated', 
+    /** Optional on site — use display-name update if column exists */
     EVIDENCE: 'Evidence',
     PAYMENT_PROOF: 'Payment_x0020_Proof',
   },
   STAFF: {
     TITLE: 'Title',
+    /** Display name: Email Address */
     EMAIL: 'Email_x0020_Address',
     DEPARTMENT: 'Department',
     ROLE: 'Role',
@@ -85,7 +105,7 @@ export const COLUMNS = {
   },
   DISCIPLINARY: {
     TITLE: 'Title',
-    CASE_REFERENCE: 'Case_x0020_Reference',
+    CASE_REFERENCE: 'CaseReference',
     ACTION_TYPE: 'Action_x0020_Type',
     ACTION_DATE: 'Action_x0020_Date',
     ACTIONED_BY: 'Actioned_x0020_By',
@@ -94,7 +114,7 @@ export const COLUMNS = {
   },
   ESCALATION: {
     TITLE: 'Title',
-    CASE_REFERENCE: 'Case_x0020_Reference',
+    CASE_REFERENCE: 'CaseReference',
     OFFENDER: 'Offender',
     REASON: 'Escalation_x0020_Reason',
     PREVIOUS_TIER: 'Previous_x0020_Tier',
@@ -105,7 +125,7 @@ export const COLUMNS = {
   },
   APPEALS: {
     TITLE: 'Title',
-    CASE_REFERENCE: 'Case_x0020_Reference',
+    CASE_REFERENCE: 'CaseReference',
     APPELLANT: 'Appellant',
     APPEAL_DATE: 'Appeal_x0020_Date',
     GROUNDS: 'Grounds_x0020_for_x0020_Appeal',
@@ -128,14 +148,14 @@ export const COLUMNS = {
   MAIL: {
     TITLE: 'Subject',
     TO: 'RecipientEmail',
-    SUBJECT: 'Subject',
+    SUBJECT: 'Title',
     BODY: 'MailBody',
     STATUS: 'Status',
   },
 } as const;
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
-export const CASE_STATUS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Acknowledged'] as const;
+export const CASE_STATUS_OPTIONS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Appeal Pending', 'Acknowledged'] as const;
 export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'] as const;
 export const CATEGORIES = ['Conduct', 'Project Integrity', 'Strategic', 'EHSQ'] as const;
 export const COMPANIES = ['KCC', 'KESL', 'Interkonstruct'] as const;

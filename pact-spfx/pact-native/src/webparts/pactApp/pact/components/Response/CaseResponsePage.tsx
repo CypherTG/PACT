@@ -53,7 +53,7 @@ function enrichCaseFromLink(caseData: ComplianceCase): ComplianceCase {
 }
 
 /**
- * CaseResponsePage - Employee Accept / Appeal landing page.
+ * CaseResponsePage — Employee Accept / Appeal landing page.
  * Reads :caseId and :action from the URL and renders the correct self-service view.
  */
 export const CaseResponsePage: React.FC = () => {
@@ -63,7 +63,7 @@ export const CaseResponsePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadCase = async (): Promise<void> => {
+    const loadCase = async () => {
       try {
         await sharePointService.initialize();
 
@@ -74,7 +74,7 @@ export const CaseResponsePage: React.FC = () => {
         }
 
         const found = await sharePointService.getCaseByReference(caseId);
-
+        
         if (!found) {
           setCaseData(buildFallbackCase(caseId));
           setLoading(false);
@@ -90,22 +90,25 @@ export const CaseResponsePage: React.FC = () => {
       }
     };
 
-    void loadCase();
+    loadCase();
   }, [caseId]);
 
   if (loading) {
     return (
+      <div className="response-page">
       <div className="response-card">
         <div className="response-loading">
           <div className="spinner" />
           <p style={{ color: '#94a3b8' }}>Loading case details...</p>
         </div>
       </div>
+      </div>
     );
   }
 
   if (error || !caseData) {
     return (
+      <div className="response-page">
       <div className="response-card">
         <div className="response-error">
           <div className="error-icon">
@@ -117,6 +120,7 @@ export const CaseResponsePage: React.FC = () => {
             If you believe this is an error, please contact your line manager or HR.
           </p>
         </div>
+      </div>
       </div>
     );
   }

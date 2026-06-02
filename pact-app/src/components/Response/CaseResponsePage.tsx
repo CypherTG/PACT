@@ -95,17 +95,20 @@ export const CaseResponsePage: React.FC = () => {
 
   if (loading) {
     return (
+      <div className="response-page">
       <div className="response-card">
         <div className="response-loading">
           <div className="spinner" />
           <p style={{ color: '#94a3b8' }}>Loading case details...</p>
         </div>
       </div>
+      </div>
     );
   }
 
   if (error || !caseData) {
     return (
+      <div className="response-page">
       <div className="response-card">
         <div className="response-error">
           <div className="error-icon">
@@ -117,6 +120,7 @@ export const CaseResponsePage: React.FC = () => {
             If you believe this is an error, please contact your line manager or HR.
           </p>
         </div>
+      </div>
       </div>
     );
   }

@@ -55,6 +55,7 @@ export const CaseDetail: React.FC = () => {
             <option value="Unpaid">Status: Unpaid</option>
             <option value="Overdue">Status: Overdue</option>
             <option value="Paid">Status: Paid</option>
+            <option value="Appeal Pending">Status: Appeal Pending</option>
             <option value="Waived">Status: Waived</option>
           </select>
         </div>
@@ -76,7 +77,7 @@ export const CaseDetail: React.FC = () => {
                 <ShieldAlert size={18} />
               </div>
               <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{caseData.title}</h2>
-              <span className={`status-badge status-${caseData.status.toLowerCase()}`}>{caseData.status}</span>
+              <span className={`status-badge status-${caseData.status.toLowerCase().replace(/\s+/g, '')}`}>{caseData.status}</span>
             </div>
             <p className="text-secondary" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Clock size={14} /> Created on {new Date(caseData.dateCreated).toLocaleDateString()}

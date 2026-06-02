@@ -10,8 +10,8 @@ export const StaffDirectory: React.FC = () => {
   const { data: staff, loading, refresh } = useSharePointCollection<StaffMember>(() => sharePointService.getStaffDirectory());
 
   const filteredStaff = staff.filter(s => 
-    s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.fullName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+    (s.email || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   if (loading) {

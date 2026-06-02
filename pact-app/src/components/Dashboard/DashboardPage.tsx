@@ -19,17 +19,23 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mailLogs, setMailLogs] = useState<any[]>([]);
 
-  useEffect(() => {
+  const loadDashboard = () => {
     sharePointService.getDashboardStats().then(data => {
       setStats(data);
       setLoading(false);
     });
-
     sharePointService.getMailHistory().then(history => {
       if (Array.isArray(history)) {
         setMailLogs(history.slice(0, 5));
       }
     });
+  };
+
+  useEffect(() => {
+    loadDashboard();
+
+    const handleDataChanged = () => loadDashboard();
+    window.addEventListener('pact-data-changed', handleDataChanged);
 
     const handleMailEvent = (e: any) => {
       if (!e.detail || !e.detail.to) return;
@@ -42,7 +48,10 @@ export const DashboardPage: React.FC = () => {
     };
 
     window.addEventListener('pact-mock-email', handleMailEvent);
-    return () => window.removeEventListener('pact-mock-email', handleMailEvent);
+    return () => {
+      window.removeEventListener('pact-mock-email', handleMailEvent);
+      window.removeEventListener('pact-data-changed', handleDataChanged);
+    };
   }, []);
 
   if (loading || !stats) {
@@ -66,8 +75,11 @@ export const DashboardPage: React.FC = () => {
         <div className="kpi-card glass-panel">
           <div className="kpi-icon info"><ShieldAlert size={24} /></div>
           <div className="kpi-content">
-            <span className="kpi-label">Active Cases</span>
+            <span className="kpi-label">Open Cases</span>
             <span className="kpi-value">{stats.totalActiveCases}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+              {stats.paidCases} paid · {stats.appealPendingCases} appeal pending
+            </span>
           </div>
         </div>
         

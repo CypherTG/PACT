@@ -13,8 +13,8 @@ export const MailLogPage: React.FC = () => {
     if (!log) return false;
     const subject = log.subject || '';
     const recipients = Array.isArray(log.to) ? log.to.join(',') : String(log.to || '');
-    return subject.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           recipients.toLowerCase().includes(searchTerm.toLowerCase());
+    return (subject || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+           (recipients || '').toLowerCase().includes((searchTerm || '').toLowerCase());
   });
 
   const getStatusStyles = (status: MailLogEntry['status']): React.CSSProperties => {

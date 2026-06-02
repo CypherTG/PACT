@@ -43,12 +43,20 @@ Short summary on functionality and used technologies.
 ## Minimal Path to Awesome
 
 - Clone this repository
-- Ensure that you are at the solution folder
-- in the command-line run:
-  - `npm install`
-  - `node_modules/.bin/gulp serve`
+- `cd pact-spfx/pact-native`
+- `npm install`
+- **Trust the dev certificate** (first time only): `npx gulp trust-dev-cert`
+- Start the SPFx dev server: `npm run serve` (runs `gulp serve` with **HTTPS** on port 4321)
 
-That will boot the SharePoint workbench dev server using the SPFx project in this folder.
+When the browser opens, the workbench URL must include local debug manifests (the terminal prints this URL). It should look like:
+
+`https://netorgft13110820.sharepoint.com/sites/KONSTRUCTUM/_layouts/15/workbench.aspx?loadSPFX=true&debug=true&noredir=true&debugManifestsFile=https://localhost:4321/temp/manifests.js`
+
+**Do not** use `http://localhost:4321` — SharePoint is HTTPS and will block HTTP manifests (CORS / scripterror).
+
+**Do not** run `scripts/pact-gulp-serve.ps1` at the same time as `gulp serve` — only one process should use port 4321.
+
+To test an employee Appeal link in the workbench, keep the `debugManifestsFile` query string above and add the hash route, e.g. `#/case-response/PACT-9882/appeal?pact_src=email`.
 
 Other build commands can be listed using `node_modules/.bin/gulp --tasks`.
 

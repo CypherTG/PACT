@@ -107,36 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="main-content scroll-container" data-testid="pact-main">
-        <header className="top-header glass-panel">
-          <div className="header-left">
-            <h2 className="page-title">
-              Executive Overview
-              <span style={{ fontSize: '10px', opacity: 0.3, marginLeft: '10px', fontWeight: 'normal' }}>v5.0-NATIVE</span>
-            </h2>
-          </div>
-
-          <div className="header-actions">
-
-            <div className="header-user-badge">
-              <div className="badge-avatar">
-                {session.photoUrl ? (
-                  <img src={session.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  session.displayName.charAt(0)
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="badge-name">{session.displayName}</span>
-                <span className="badge-email" style={{ fontSize: '10px', opacity: 0.6 }}>{session.email}</span>
-              </div>
-            </div>
-
-            <button className="btn btn-primary log-incident-btn" onClick={() => history.push('/cases/new')} data-testid="log-incident-button">
-              <ShieldAlert size={16} />
-              Log Incident
-            </button>
-          </div>
-        </header>
+        {/* Header removed to prevent duplicate toolbars */}
 
         <div className="page-container" data-testid="pact-page-container">
           {children}

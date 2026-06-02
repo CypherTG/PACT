@@ -16,8 +16,8 @@ export const PolicyLibrary: React.FC = () => {
   }, []);
 
   const filteredPolicies = policies.filter(p => 
-    p.offenceName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.offenceName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+    (p.category || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   return (

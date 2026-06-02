@@ -18,7 +18,7 @@ export interface ComplianceCase {
   dueDate: string;
   issuerName: string;
   secondaryContact: string;
-  status: 'Unpaid' | 'Paid' | 'Overdue' | 'Waived' | 'Acknowledged';
+  status: 'Unpaid' | 'Paid' | 'Overdue' | 'Waived' | 'Acknowledged' | 'Appeal Pending';
   dateCreated: string;
   evidence?: string;
 }
@@ -131,6 +131,8 @@ export interface UserSession {
 // ─── UI Types ───────────────────────────────────────────────────────────────
 export interface DashboardStats {
   totalActiveCases: number;
+  paidCases: number;
+  appealPendingCases: number;
   escalationsThisMonth: number;
   pendingAppeals: number;
   repeatOffenders: number;

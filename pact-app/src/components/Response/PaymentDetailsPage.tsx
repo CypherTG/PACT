@@ -48,6 +48,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
 
   if (submitted) {
     return (
+      <div className="response-page payment-page">
       <div className="response-card">
         <div>
           <div><CheckCircle size={32} /></div>
@@ -58,12 +59,12 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
           </p>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <>
-      {/* Card Header */}
+    <div className="response-page payment-page">
       <div className="response-card">
         <div className="response-card-header">
           <div className="icon-circle accept">
@@ -256,7 +257,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

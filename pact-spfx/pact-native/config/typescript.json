@@ -2,8 +2,8 @@
   "extends": "@microsoft/spfx-web-build-rig/profiles/default/config/typescript.json",
 
   "staticAssetsToCopy": {
-    "fileExtensions": [".resx", ".jpg", ".png", ".woff", ".eot", ".ttf", ".svg", ".gif"],
+    "fileExtensions": [".resx", ".jpg", ".png", ".json", ".woff", ".eot", ".ttf", ".svg", ".gif"],
 
-    "includeGlobs": ["webparts/*/loc/*.js"]
+    "includeGlobs": ["webparts/*/loc/*.js", "webparts/*/pact/assets/*", "webparts/*/pact/data/*"]
   }
 }

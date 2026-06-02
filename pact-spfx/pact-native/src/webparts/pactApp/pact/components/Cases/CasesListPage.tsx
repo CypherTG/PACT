@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { ComplianceCase } from '../../config/types';
-import { useSharePointCollection } from '../../hooks/useSharePointCollection';
+import './Cases.css';
 
 export const CasesListPage: React.FC = () => {
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const { data: cases, loading, refresh } = useSharePointCollection<ComplianceCase>(() => sharePointService.getCases());
+  const [cases, setCases] = useState<ComplianceCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    sharePointService.getCases().then(data => {
+      setCases(data);
+      setLoading(false);
+    });
+  }, []);
 
   const filteredCases = cases.filter(c => 
     (c.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -17,8 +25,8 @@ export const CasesListPage: React.FC = () => {
   if (loading) {
     return (
       <div className="cases-container">
-        <div className="cases-header skeleton" style={{height: '60px', borderRadius: 'var(--radii-md)'}} />
-        <div className="cases-table-container glass-panel skeleton" style={{height: '400px', marginTop: '2rem'}} />
+        <div className="cases-header skeleton" style={{height: '60px', borderRadius: 'var(--radii-md)'}}></div>
+        <div className="cases-table-container glass-panel skeleton" style={{height: '400px', marginTop: '2rem'}}></div>
       </div>
     );
   }
@@ -39,9 +47,6 @@ export const CasesListPage: React.FC = () => {
         <div className="cases-actions">
           <button type="button" className="btn btn-secondary" data-testid="cases-filter-button">
             <Filter size={16} /> Filter
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)} data-testid="cases-refresh-button">
-            <RefreshCw size={16} /> Refresh
           </button>
           <NavLink to="/cases/new" className="btn btn-primary" data-testid="cases-new-button">
             <Plus size={16} /> New Case
@@ -76,8 +81,8 @@ export const CasesListPage: React.FC = () => {
                   <td>{c.offenceCategoryName || 'Unknown'}</td>
                   <td>{new Date(c.dueDate).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status-badge status-${(c.status || 'pending').toLowerCase()}`}>
-                      {c.status || 'Pending'}
+                    <span className={`status-badge status-${(c.status || '').toLowerCase().replace(/\s+/g, '')}`}>
+                      {c.status}
                     </span>
                   </td>
                   <td>

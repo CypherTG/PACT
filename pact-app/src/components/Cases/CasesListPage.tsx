@@ -18,7 +18,7 @@ export const CasesListPage: React.FC = () => {
   }, []);
 
   const filteredCases = cases.filter(c => 
-    c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
     (c.chargedPersonName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -81,7 +81,7 @@ export const CasesListPage: React.FC = () => {
                   <td>{c.offenceCategoryName || 'Unknown'}</td>
                   <td>{new Date(c.dueDate).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status-badge status-${c.status.toLowerCase()}`}>
+                    <span className={`status-badge status-${(c.status || '').toLowerCase().replace(/\s+/g, '')}`}>
                       {c.status}
                     </span>
                   </td>

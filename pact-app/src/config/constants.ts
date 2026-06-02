@@ -3,12 +3,27 @@
  * Central configuration for SharePoint site, list names, and column internal names
  */
 
+import { readViteEnv } from './env';
+
 // ─── Organisation Email Addresses ───────────────────────────────────────────
 export const HR_EMAIL = 'mbello@konstructum.com'; // HR Department
 export const LEGAL_EMAIL = 'legal@konstructum.com'; // Legal Department
 export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeholder)
+export const CHAIRMAN_EMAIL = readViteEnv('VITE_CHAIRMAN_EMAIL').trim() || 'mbello@konstructum.com'; // Chairman
+export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a2651047ffd44146a15bdcb3d0fc110b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MQClT4tptDeXdC7H3K4gcUmn0g1yb7YxzjJxYhBAtZA'; // HTTP Flow Webhook URL
+export const ACCEPT_PAYMENT_TRIGGER_URL = readViteEnv('VITE_ACCEPT_PAYMENT_TRIGGER_URL').trim() || MAIL_TRIGGER_URL; // Accept/payment HTTP Flow URL
+export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/355bb22182fe466cb4f33218b62ee1ca/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bbOk-FnU8nwVdLhol2InFt7zzIHbliF8TyH1cSCxaHQ'; // Appeal HTTP Flow Webhook URL
 export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
 export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
+
+/** Values for PACT Compliance Cases → Status (add matching choices in SharePoint). */
+export const CASE_STATUS = {
+  UNPAID: 'Unpaid',
+  PAID: 'Paid',
+  OVERDUE: 'Overdue',
+  WAIVED: 'Waived',
+  APPEAL_PENDING: 'Appeal Pending',
+} as const;
 
 /**
  * Employee case-response one-pager (e.g. Vercel). Routes use HashRouter:
@@ -16,9 +31,7 @@ export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
  * Set in `.env`: `VITE_RESPONSE_PORTAL_URL=https://your-app.vercel.app`
  * Leave empty to use the current page origin (SharePoint or local dev).
  */
-export const RESPONSE_PORTAL_BASE_URL = String(import.meta.env.VITE_RESPONSE_PORTAL_URL ?? '')
-  .trim()
-  .replace(/\/$/, '');
+export const RESPONSE_PORTAL_BASE_URL = readViteEnv('VITE_RESPONSE_PORTAL_URL').trim().replace(/\/$/, '');
 
 /**
  * Accept / Appeal flows are gated: valid only when the URL includes this query (added to every email button link).
@@ -142,7 +155,7 @@ export const COLUMNS = {
 } as const;
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
-export const CASE_STATUS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Acknowledged'] as const;
+export const CASE_STATUS_OPTIONS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Appeal Pending', 'Acknowledged'] as const;
 export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'] as const;
 export const CATEGORIES = ['Conduct', 'Project Integrity', 'Strategic', 'EHSQ'] as const;
 export const COMPANIES = ['KCC', 'KESL', 'Interkonstruct'] as const;

@@ -55,7 +55,7 @@ export const AppealForm: React.FC<AppealFormProps> = ({ onClose, onSuccess }) =>
       <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
         <CheckCircle size={48} color="var(--status-success)" style={{ marginBottom: '1rem' }} />
         <h3>Appeal Submitted Successfully</h3>
-        <p className="text-secondary">Your appeal has been logged and will be reviewed by HR/Legal.</p>
+        <p className="text-secondary">Your appeal has been logged and will be reviewed by Admin or Executive review.</p>
       </div>
     );
   }

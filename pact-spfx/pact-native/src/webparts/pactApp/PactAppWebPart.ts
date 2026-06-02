@@ -22,8 +22,22 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
   private _environmentMessage: string = '';
   private _workbenchHost: HTMLDivElement | null = null;
 
+  private _isCaseResponseRoute(): boolean {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash || '';
+    const path = window.location.pathname || '';
+    return hash.includes('/case-response/') || path.includes('/case-response/');
+  }
+
+  private _syncHostLayoutClasses(): void {
+    const isResponse = this._isCaseResponseRoute();
+    this.domElement.classList.toggle('pact-response-route', isResponse);
+    this.domElement.classList.toggle('pact-full-width-container', !isResponse);
+    document.documentElement.classList.toggle('pact-response-active', isResponse);
+  }
+
   public render(): void {
-    // Inject CSS to force SharePoint Workbench and Canvas to be full-width
+    // Inject CSS to force SharePoint Workbench and Canvas to be full-width (admin routes)
     const styleId = 'pact-full-bleed-styles';
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
@@ -59,11 +73,32 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
         .pact-full-width-container {
           flex: 1 1 auto !important;
         }
+
+        .pact-response-route {
+          width: 100% !important;
+          max-width: none !important;
+          min-width: 0 !important;
+          min-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: visible !important;
+        }
+
+        html.pact-response-active,
+        html.pact-response-active body {
+          overflow: hidden !important;
+          background: #0a0a12 !important;
+        }
       `;
       document.head.appendChild(style);
     }
 
-    this.domElement.classList.add('pact-full-width-container');
+    this._syncHostLayoutClasses();
+    if (!(this.domElement as HTMLElement & { _pactHashListener?: boolean })._pactHashListener) {
+      window.addEventListener('hashchange', () => this._syncHostLayoutClasses());
+      (this.domElement as HTMLElement & { _pactHashListener?: boolean })._pactHashListener = true;
+    }
+
     this.domElement.style.width = '100%';
     this.domElement.style.maxWidth = 'none';
     this.domElement.style.minWidth = '0';
@@ -135,6 +170,7 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
   }
 
   protected onDispose(): void {
+    document.documentElement.classList.remove('pact-response-active');
     ReactDom.unmountComponentAtNode(this.domElement);
   }
 
