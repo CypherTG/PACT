@@ -12,7 +12,7 @@ export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeho
 export const CHAIRMAN_EMAIL = readViteEnv('VITE_CHAIRMAN_EMAIL').trim() || 'mbello@konstructum.com'; // Chairman
 export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a2651047ffd44146a15bdcb3d0fc110b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MQClT4tptDeXdC7H3K4gcUmn0g1yb7YxzjJxYhBAtZA'; // HTTP Flow Webhook URL
 export const ACCEPT_PAYMENT_TRIGGER_URL = readViteEnv('VITE_ACCEPT_PAYMENT_TRIGGER_URL').trim() || MAIL_TRIGGER_URL; // Accept/payment HTTP Flow URL
-export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/355bb22182fe466cb4f33218b62ee1ca/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bbOk-FnU8nwVdLhol2InFt7zzIHbliF8TyH1cSCxaHQ'; // Appeal HTTP Flow Webhook URL
+export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/13674850ca7a4f3d92da2893be5d9ad5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bcSyAnrS7dq9AQ1Dza6SDmpP0h0ybnqGPqRvPwsTgw0'; // Appeal HTTP Flow Webhook URL
 export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
 export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
 

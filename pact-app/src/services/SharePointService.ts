@@ -414,7 +414,16 @@ export class SharePointService {
 
     const data = await response.json();
     const serverRelativeUrl = data?.d?.ServerRelativeUrl || `${folderPath}/${fileName}`;
-    return `${this.siteUrl}${serverRelativeUrl.startsWith('/') ? '' : '/'}${serverRelativeUrl}`.replace(/([^:]\/)\/+/g, '$1');
+    let baseUrl = this.siteUrl;
+    try {
+      if (this.siteUrl.startsWith('http://') || this.siteUrl.startsWith('https://')) {
+        const urlObj = new URL(this.siteUrl);
+        baseUrl = urlObj.origin;
+      }
+    } catch {
+      // Fallback if URL parsing fails
+    }
+    return `${baseUrl}${serverRelativeUrl.startsWith('/') ? '' : '/'}${serverRelativeUrl}`;
   }
 
   private notifyDataChanged(): void {
