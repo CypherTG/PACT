@@ -845,11 +845,34 @@ export class SharePointService {
   }
 
 
-  // --- Staff ---
-
   public async getStaffDirectory(): Promise<StaffMember[]> {
-    // ALWAYS use local JSON data for now as requested
-    return staffData as StaffMember[];
+    try {
+      if (this.isLocal) {
+        return staffData as StaffMember[];
+      }
+
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.STAFF_DIRECTORY}')/items?$top=5000`;
+      const data = await this.fetchREST(endpoint);
+      
+      if (data && data.results && data.results.length > 0) {
+        return data.results.map((item: any) => ({
+          id: String(item.Id || item.ID || ''),
+          fullName: item[COLUMNS.STAFF.TITLE] || '',
+          email: item[COLUMNS.STAFF.EMAIL] || '',
+          department: item[COLUMNS.STAFF.DEPARTMENT] || '',
+          lineManager: item[COLUMNS.STAFF.LINE_MANAGER] || '',
+          company: item[COLUMNS.STAFF.COMPANY] || '',
+          role: item[COLUMNS.STAFF.ROLE] || '',
+          employeeType: item[COLUMNS.STAFF.EMPLOYEE_TYPE] || '',
+          status: item[COLUMNS.STAFF.STATUS] || 'Active'
+        }));
+      }
+      
+      return staffData as StaffMember[];
+    } catch (error) {
+      console.warn("Failed to fetch staff from SharePoint list, falling back to local JSON", error);
+      return staffData as StaffMember[];
+    }
   }
 
   // --- Policies ---
