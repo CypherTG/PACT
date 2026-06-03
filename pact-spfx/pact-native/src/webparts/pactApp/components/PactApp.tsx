@@ -130,19 +130,19 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
               background: transparent;
             }
             .pact-startup-card {
-              background: #ffffff;
-              border: 1px solid rgba(0, 0, 0, 0.12);
+              background: linear-gradient(145deg, #ffffff, #fdfbfb);
+              border: none;
               border-radius: 16px;
-              padding: 2.5rem;
-              max-width: 440px;
+              padding: 3rem 2.5rem;
+              max-width: 540px;
               width: 100%;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+              box-shadow: 0 12px 32px rgba(0, 0, 0, 0.04), 0 0 20px rgba(220, 38, 38, 0.015);
               text-align: center;
               box-sizing: border-box;
               transition: all 0.3s ease;
             }
             .pact-startup-card:hover {
-              box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+              box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06), 0 0 25px rgba(220, 38, 38, 0.03);
               transform: translateY(-2px);
             }
             .pact-startup-logo {
