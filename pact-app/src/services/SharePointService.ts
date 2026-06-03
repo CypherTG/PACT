@@ -830,32 +830,46 @@ export class SharePointService {
   public async getStaffDirectory(): Promise<StaffMember[]> {
     try {
       if (this.isLocal) {
-        return staffData as StaffMember[];
+        return (staffData as StaffMember[]).map(item => ({
+          ...item,
+          photoUrl: this.getPhotoUrl(item.email)
+        }));
       }
 
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.STAFF_DIRECTORY}')/items?$top=5000`;
       const data = await this.fetchREST(endpoint);
       
       if (data && data.results && data.results.length > 0) {
-        return data.results.map((item: any) => ({
-          id: String(item.Id || item.ID || ''),
-          fullName: item[COLUMNS.STAFF.TITLE] || '',
-          email: item[COLUMNS.STAFF.EMAIL] || '',
-          department: item[COLUMNS.STAFF.DEPARTMENT] || '',
-          lineManager: item[COLUMNS.STAFF.LINE_MANAGER] || '',
-          company: item[COLUMNS.STAFF.COMPANY] || '',
-          role: item[COLUMNS.STAFF.ROLE] || '',
-          employeeType: item[COLUMNS.STAFF.EMPLOYEE_TYPE] || '',
-          status: item[COLUMNS.STAFF.STATUS] || 'Active'
-        }));
+        return data.results.map((item: any) => {
+          const email = item[COLUMNS.STAFF.EMAIL] || '';
+          return {
+            id: String(item.Id || item.ID || ''),
+            fullName: item[COLUMNS.STAFF.TITLE] || '',
+            email: email,
+            department: item[COLUMNS.STAFF.DEPARTMENT] || '',
+            lineManager: item[COLUMNS.STAFF.LINE_MANAGER] || '',
+            company: item[COLUMNS.STAFF.COMPANY] || '',
+            role: item[COLUMNS.STAFF.ROLE] || '',
+            employeeType: item[COLUMNS.STAFF.EMPLOYEE_TYPE] || '',
+            status: item[COLUMNS.STAFF.STATUS] || 'Active',
+            photoUrl: email ? this.getPhotoUrl(email) : undefined
+          };
+        });
       }
       
-      return staffData as StaffMember[];
+      return (staffData as StaffMember[]).map(item => ({
+        ...item,
+        photoUrl: this.getPhotoUrl(item.email)
+      }));
     } catch (error) {
       console.warn("Failed to fetch staff from SharePoint list, falling back to local JSON", error);
-      return staffData as StaffMember[];
+      return (staffData as StaffMember[]).map(item => ({
+        ...item,
+        photoUrl: this.getPhotoUrl(item.email)
+      }));
     }
   }
+
 
   // --- Policies ---
   public async getPolicyLibrary(): Promise<PolicyOffence[]> {
