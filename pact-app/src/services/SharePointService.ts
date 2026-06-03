@@ -432,24 +432,6 @@ export class SharePointService {
     }
   }
 
-  private async postHttpTrigger(triggerUrl: string, payload: Record<string, unknown>): Promise<void> {
-    if (!triggerUrl) {
-      throw new Error('HTTP trigger URL is not configured.');
-    }
-
-    const response = await fetch(triggerUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=UTF-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (response.type !== 'opaque' && !response.ok) {
-      throw new Error(`HTTP trigger returned status ${response.status}`);
-    }
-  }
 
   private escapeHtml(value: unknown): string {
     return String(value ?? '')

@@ -193,7 +193,7 @@
     "department": "Kadet",
     "lineManager": "abalogun@konstructum.com",
     "company": "KCC",
-    "role": "Staff",
+    "role": "Kadet",
     "employeeType": "Employee",
     "status": "Active"
   },
@@ -259,7 +259,7 @@
     "department": "Kadet",
     "lineManager": "mcoker@konstructum.com",
     "company": "KCC",
-    "role": "Staff",
+    "role": "Kadet",
     "employeeType": "Employee",
     "status": "Active"
   },
@@ -270,7 +270,7 @@
     "department": "Kadet",
     "lineManager": "oosibogun@konstructum.com",
     "company": "KCC",
-    "role": "Staff",
+    "role": "Kadet",
     "employeeType": "Employee",
     "status": "Active"
   }
