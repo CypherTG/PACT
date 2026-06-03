@@ -75,7 +75,7 @@ export const StaffProfile: React.FC = () => {
       <div className="cases-header">
         <NavLink to="/staff" className="btn btn-secondary"><ArrowLeft size={16}/> Back to Directory</NavLink>
         <div style={{display: 'flex', gap: '12px'}}>
-          <button className="btn btn-primary"><Mail size={16}/> Contact Staff</button>
+          <a href={`mailto:${member.email}`} className="btn btn-primary" style={{textDecoration: 'none'}}><Mail size={16}/> Contact Staff</a>
         </div>
       </div>
 
@@ -92,7 +92,20 @@ export const StaffProfile: React.FC = () => {
               overflow: 'hidden'
             }}>
               {member.photoUrl ? (
-                <img src={member.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img 
+                  src={member.photoUrl} 
+                  alt="" 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = member.fullName.charAt(0);
+                      parent.style.background = 'linear-gradient(135deg, var(--primary), #d2334e)';
+                    }
+                  }}
+                />
               ) : (
                 member.fullName.charAt(0)
               )}

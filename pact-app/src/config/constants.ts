@@ -7,7 +7,7 @@ import { readViteEnv } from './env';
 
 // ─── Organisation Email Addresses ───────────────────────────────────────────
 export const HR_EMAIL = 'mbello@konstructum.com'; // HR Department
-export const LEGAL_EMAIL = 'legal@konstructum.com'; // Legal Department
+export const LEGAL_EMAIL = 'abalogun@konstructum.com'; // Legal Department
 export const COMPLIANCE_EMAIL = 'mbello@konstructum.com'; // Compliance (placeholder)
 export const CHAIRMAN_EMAIL = readViteEnv('VITE_CHAIRMAN_EMAIL').trim() || 'mbello@konstructum.com'; // Chairman
 export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a2651047ffd44146a15bdcb3d0fc110b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MQClT4tptDeXdC7H3K4gcUmn0g1yb7YxzjJxYhBAtZA'; // HTTP Flow Webhook URL

@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL, MAIL_TRIGGER_URL, ACCEPT_PAYMENT_TRIGGER_URL, APPEAL_MAIL_TRIGGER_URL, APPEAL_SLA_DAYS, PAYMENT_PROOFS_LIBRARY, CASE_STATUS, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL, MAIL_TRIGGER_URL, ACCEPT_PAYMENT_TRIGGER_URL, APPEAL_MAIL_TRIGGER_URL, APPEAL_SLA_DAYS, PAYMENT_DEADLINE_DAYS, PAYMENT_PROOFS_LIBRARY, CASE_STATUS, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -1006,17 +1006,18 @@ export class SharePointService {
       
       if (data && data.results && data.results.length > 0) {
         return data.results.map((item: any) => {
-          const email = item[COLUMNS.STAFF.EMAIL] || '';
+          const email = item[COLUMNS.STAFF.EMAIL] || item.EmailAddress || item.Email || item.email || '';
+          const lineManager = item[COLUMNS.STAFF.LINE_MANAGER] || item.LineManager || item.Line_x0020_Manager || item.lineManager || '';
           return {
             id: String(item.Id || item.ID || ''),
-            fullName: item[COLUMNS.STAFF.TITLE] || '',
+            fullName: item[COLUMNS.STAFF.TITLE] || item.Title || item.fullName || '',
             email: email,
-            department: item[COLUMNS.STAFF.DEPARTMENT] || '',
-            lineManager: item[COLUMNS.STAFF.LINE_MANAGER] || '',
-            company: item[COLUMNS.STAFF.COMPANY] || '',
-            role: item[COLUMNS.STAFF.ROLE] || '',
-            employeeType: item[COLUMNS.STAFF.EMPLOYEE_TYPE] || '',
-            status: item[COLUMNS.STAFF.STATUS] || 'Active',
+            department: item[COLUMNS.STAFF.DEPARTMENT] || item.Department || item.department || '',
+            lineManager: lineManager,
+            company: item[COLUMNS.STAFF.COMPANY] || item.Company || item.company || '',
+            role: item[COLUMNS.STAFF.ROLE] || item.Role || item.role || '',
+            employeeType: item[COLUMNS.STAFF.EMPLOYEE_TYPE] || item.EmployeeType || item.employeeType || '',
+            status: item[COLUMNS.STAFF.STATUS] || item.Status || item.status || 'Active',
             photoUrl: email ? this.getPhotoUrl(email) : undefined
           };
         });
@@ -1371,13 +1372,57 @@ export class SharePointService {
       const manager = staff.find(member =>
         member.fullName === person?.lineManager || member.email === person?.lineManager
       );
-      const recipients = Array.from(new Set([
-        newCase.staffEmail,
-        manager?.email
-      ].filter(Boolean) as string[]));
 
-      if (recipients.length > 0) {
-        await this.sendEmailNotification(recipients, emailSubject, emailBody);
+      // 1. Send detailed email with action buttons to the offender
+      if (newCase.staffEmail) {
+        await this.sendEmailNotification([newCase.staffEmail], emailSubject, emailBody);
+      }
+
+      // 2. Send separate awareness notification to the supervisor/line manager (if resolved)
+      if (manager?.email) {
+        const managerSubject = `[Manager Awareness] PACT ALERT: ${this.expandAbbreviations(offenceLabel)} - ${staffDisplay} (Ref: ${newCase.title})`;
+        const managerBody = `
+          <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="border-bottom: 2px solid #ca5010; padding-bottom: 12px; margin-bottom: 20px;">
+              <h2 style="color: #ca5010; margin: 0; font-size: 20px;">PACT Platform — Manager Notification</h2>
+            </div>
+            <p style="font-size: 15px; line-height: 1.5;">Hello <b>${manager.fullName || 'Manager'}</b>,</p>
+            <p style="font-size: 15px; line-height: 1.5;">This is an administrative notification that a compliance notice has been logged against your direct report, <b>${staffDisplay}</b>. Below are the details:</p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin: 20px 0;">
+              <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500; width: 150px;">Case Reference:</td>
+                  <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${newCase.title}</td>
+                </tr>
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Offence:</td>
+                  <td style="color: #0f172a; padding: 6px 0;">${this.expandAbbreviations(offenceLabel)}</td>
+                </tr>
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Description:</td>
+                  <td style="color: #334155; padding: 6px 0; line-height: 1.4;">${newCase.offenceDescription || 'Please review the case details in PACT.'}</td>
+                </tr>
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Penalty Amount:</td>
+                  <td style="color: #e11d48; padding: 6px 0; font-weight: bold; font-size: 15px;">₦${newCase.penaltyAmount.toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Sanction/Action:</td>
+                  <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${disciplinaryAction}</td>
+                </tr>
+                <tr>
+                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Response Due Date:</td>
+                  <td style="color: #f59e0b; padding: 6px 0; font-weight: bold;">${new Date(newCase.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                </tr>
+              </table>
+            </div>
+            <p style="font-size: 14px; line-height: 1.5; color: #475569;">No direct action is required from you at this stage. The employee has been notified and given ${PAYMENT_DEADLINE_DAYS} days to respond (Accept & Pay or Appeal).</p>
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 32px; padding-top: 16px; border-top: 1px solid #f1f5f9; text-align: center; line-height: 1.4;">
+              This is an automated administrative notification from the PACT Compliance Governance Platform.
+            </p>
+          </div>
+        `;
+        await this.sendEmailNotification([manager.email], managerSubject, managerBody);
       }
     } catch (e) {
       console.warn('Notification email failed', e);

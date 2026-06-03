@@ -45,7 +45,7 @@ export const CasesListPage: React.FC = () => {
           />
         </div>
         <div className="cases-actions">
-          <button type="button" className="btn btn-secondary" data-testid="cases-filter-button">
+          <button type="button" className="btn btn-secondary" data-testid="cases-filter-button" onClick={() => alert('Filtering UI coming soon')}>
             <Filter size={16} /> Filter
           </button>
           <NavLink to="/cases/new" className="btn btn-primary" data-testid="cases-new-button">

@@ -130,9 +130,9 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
               background: transparent;
             }
             .pact-startup-card {
-              background: linear-gradient(135deg, #fffefe, #fff5f5);
-              border: none !important;
-              border-radius: 16px;
+              background: #FFFFFF;
+              border: 1px solid #E0E0E0 !important;
+              border-radius: 8px;
               padding: 3rem 3rem;
               max-width: 580px;
               width: 100%;
@@ -149,34 +149,35 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
               width: 64px;
               height: 64px;
               margin: 0 auto 1.5rem;
-              background: linear-gradient(135deg, #dc2626, #ff6b35);
-              border-radius: 16px;
+              background: transparent;
+              border-radius: 0;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 2rem;
+              font-size: 48px;
+              font-family: serif;
               font-weight: bold;
-              color: white;
-              box-shadow: 0 8px 20px rgba(220, 38, 38, 0.25);
+              color: #1A1A1A;
+              box-shadow: none;
               overflow: hidden;
             }
             .pact-startup-title {
-              font-size: 1.6rem;
+              font-size: 20px;
               font-weight: 700;
-              color: #111827;
+              color: #1A1A1A;
               margin: 0 0 0.5rem;
             }
             .pact-startup-subtitle {
-              font-size: 0.95rem;
-              color: #4b5563;
+              font-size: 11px;
+              color: #C0272D;
               font-weight: 600;
               margin: 0 0 1.25rem;
               text-transform: uppercase;
-              letter-spacing: 0.05em;
+              letter-spacing: 2px;
             }
             .pact-startup-desc {
-              font-size: 0.875rem;
-              color: #6b7280;
+              font-size: 13px;
+              color: #666666;
               line-height: 1.6;
               margin-bottom: 2rem;
             }
@@ -186,21 +187,21 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
               justify-content: center;
               width: 100%;
               padding: 0.85rem 1.5rem;
-              background: linear-gradient(135deg, #dc2626, #d2334e);
+              background: #C0272D;
               color: white;
-              font-size: 1rem;
+              font-size: 14px;
               font-weight: 600;
               border: none;
-              border-radius: 10px;
+              border-radius: 6px;
               cursor: pointer;
-              box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+              box-shadow: none;
               transition: all 0.2s ease;
               gap: 8px;
             }
             .pact-startup-btn:hover {
               transform: translateY(-1px);
-              box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
-              background: linear-gradient(135deg, #b91c1c, #dc2626);
+              background: #A02025;
+              box-shadow: none;
             }
             
             /* Full page overlay layout */
@@ -271,18 +272,7 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
             <div className="pact-startup-container">
               <div className="pact-startup-card">
                 <div className="pact-startup-logo">
-                  <img 
-                    src={require('../assets/kcc-logo.png')} 
-                    alt="KCC" 
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                      const parent = (e.target as HTMLImageElement).parentElement;
-                      if (parent) {
-                        parent.innerText = 'P';
-                      }
-                    }}
-                  />
+                  K
                 </div>
                 <h2 className="pact-startup-title">PACT Portal</h2>
                 <div className="pact-startup-subtitle">Konstructum</div>

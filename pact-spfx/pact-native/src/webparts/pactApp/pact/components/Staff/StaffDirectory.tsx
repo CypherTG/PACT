@@ -36,7 +36,7 @@ export const StaffDirectory: React.FC = () => {
           />
         </div>
         <div className="cases-actions">
-          <button className="btn btn-secondary">
+          <button className="btn btn-secondary" onClick={() => alert('Department filtering coming soon')}>
             <Filter size={16} /> Filter by Dept
           </button>
           <button className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)}>
@@ -63,7 +63,20 @@ export const StaffDirectory: React.FC = () => {
                     <div className="person-cell">
                       <div className="person-avatar" style={{ background: s.photoUrl ? 'none' : 'rgba(255,255,255,0.05)', color: 'white', overflow: 'hidden' }}>
                         {s.photoUrl ? (
-                          <img src={s.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img 
+                            src={s.photoUrl} 
+                            alt="" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = s.fullName.charAt(0);
+                                parent.style.background = 'rgba(255,255,255,0.05)';
+                              }
+                            }}
+                          />
                         ) : (
                           s.fullName.charAt(0)
                         )}
