@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACT Platform Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0f172a;
+      --bg-surface: rgba(30, 41, 59, 0.7);
+      --primary: #dc2626;
+      --primary-hover: #b91c1c;
+      --secondary: #3b82f6;
+      --secondary-hover: #2563eb;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+      --border-light: rgba(255, 255, 255, 0.08);
+      --radii-lg: 16px;
+      --radii-xl: 24px;
+      --font-sans: 'Inter', sans-serif;
+      --font-display: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+      padding: 2rem 1rem;
+    }
+
+    /* Ambient Background Glows */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: -10%;
+      width: 50%;
+      height: 50%;
+      background: radial-gradient(circle, rgba(220, 38, 38, 0.15) 0%, transparent 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -10%;
+      right: -10%;
+      width: 50%;
+      height: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .portal-container {
+      max-width: 960px;
+      width: 100%;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    .portal-header {
+      text-align: center;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 1rem;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), #ff6b35);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.5rem;
+      color: white;
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text-primary), #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .portal-subtitle {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      max-width: 540px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .portal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+    }
+
+    .portal-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radii-xl);
+      padding: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .portal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: transparent;
+      transition: background 0.3s ease;
+    }
+
+    .portal-card.vite-app::before {
+      background: linear-gradient(90deg, var(--primary), #ff6b35);
+    }
+
+    .portal-card.spfx-app::before {
+      background: linear-gradient(90deg, var(--secondary), #60a5fa);
+    }
+
+    .portal-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header h3 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .vite-app h3 {
+      color: #ff8c00;
+    }
+
+    .spfx-app h3 {
+      color: #60a5fa;
+    }
+
+    .card-desc {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .card-details {
+      list-style: none;
+      margin-bottom: 2rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card-details li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-details li::before {
+      content: '✦';
+      color: var(--primary);
+    }
+
+    .spfx-app .card-details li::before {
+      color: var(--secondary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.8rem 1.5rem;
+      border-radius: var(--radii-lg);
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      gap: 8px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #ef4444);
+      color: white;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary), #2563eb);
+      color: white;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: linear-gradient(135deg, var(--secondary-hover), var(--secondary));
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-light);
+      color: var(--text-primary);
+      margin-top: 0.75rem;
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .portal-footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 1rem;
+    }
+
+    .portal-footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+
+    .portal-footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="portal-container">
+    <header class="portal-header">
+      <div class="logo-container">
+        <div class="logo-icon">P</div>
+        <h1 class="logo-text">PACT Portal</h1>
+      </div>
+      <p class="portal-subtitle">
+        Policy Agreement & Compliance Tracking system for Konstructum.
+      </p>
+    </header>
+
+    <main class="portal-grid">
+      <!-- Vite Application Card -->
+      <section class="portal-card vite-app">
+        <div class="card-header">
+          <h3>Vite Standalone App</h3>
+          <p class="card-desc">
+            Fast, client-side web application running locally. Perfect for full administration, metrics tracking, and case management.
+          </p>
+          <ul class="card-details">
+            <li>Local host port: 5180</li>
+            <li>Fully responsive React frontend</li>
+            <li>Vite build speed optimization</li>
+          </ul>
+        </div>
+        <a href="http://localhost:5180" target="_blank" class="btn btn-primary">
+          Launch Local App
+        </a>
+      </section>
+
+      <!-- SharePoint Web Part Card -->
+      <section class="portal-card spfx-app">
+        <div class="card-header">
+          <h3>SharePoint Web Part</h3>
+          <p class="card-desc">
+            Native SPFx component designed for intranet deployment. Integrates seamlessly into Konstructum's corporate SharePoint environment.
+          </p>
+          <ul class="card-details">
+            <li>Runs inside SharePoint context</li>
+            <li>Direct list & document API access</li>
+            <li>No external database dependencies</li>
+          </ul>
+        </div>
+        <div>
+          <a href="https://localhost:4321/temp/workbench.html" target="_blank" class="btn btn-secondary">
+            Open Local Workbench
+          </a>
+          <a href="https://netorgft13110820.sharepoint.com/sites/KONSTRUCTUM" target="_blank" class="btn btn-outline">
+            View Live Site
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="portal-footer">
+      <p>PACT Platform · Powered by SharePoint REST & React · © 2026 Konstructum Group</p>
+    </footer>
+  </div>
+</body>
+</html>
