@@ -88,17 +88,6 @@
     "status": "Active"
   },
   {
-    "id": "9",
-    "fullName": "John Okene",
-    "email": "jokene@konstructum.com",
-    "department": "Engineering",
-    "lineManager": "aawobokun@konstructum.com",
-    "company": "KCC",
-    "role": "Staff",
-    "employeeType": "Employee",
-    "status": "Active"
-  },
-  {
     "id": "10",
     "fullName": "Damilola Igun",
     "email": "digun@konstructum.com",
@@ -271,6 +260,28 @@
     "lineManager": "oosibogun@konstructum.com",
     "company": "KCC",
     "role": "Kadet",
+    "employeeType": "Employee",
+    "status": "Active"
+  },
+  {
+    "id": "26",
+    "fullName": "Ugeh Collins",
+    "email": "ccugeh.konstructum@outlook.com",
+    "department": "Kadet",
+    "lineManager": "vochi@konstructum.com",
+    "company": "KCC",
+    "role": "Kadet",
+    "employeeType": "Employee",
+    "status": "Active"
+  },
+  {
+    "id": "27",
+    "fullName": "Victor Ochi",
+    "email": "vochi@konstructum.com",
+    "department": "Engineering",
+    "lineManager": "aawobokun@konstructum.com",
+    "company": "KCC",
+    "role": "Staff",
     "employeeType": "Employee",
     "status": "Active"
   }

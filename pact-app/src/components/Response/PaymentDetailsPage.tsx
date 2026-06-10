@@ -144,7 +144,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
             </h3>
             <div className="bank-details-row">
               <span className="bd-label">Bank Name</span>
-              <span className="bd-value">First Bank of Nigeria</span>
+              <span className="bd-value">Zenith Bank</span>
             </div>
             <div className="bank-details-row">
               <span className="bd-label">Account Name</span>
@@ -152,7 +152,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
             </div>
             <div className="bank-details-row">
               <span className="bd-label">Account Number</span>
-              <span className="bd-value">0123456789</span>
+              <span className="bd-value">1312265626</span>
             </div>
             <div className="bank-details-row">
               <span className="bd-label">Payment Reference</span>
@@ -177,7 +177,13 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
             </div>
           </div>
 
-          {!alreadyPaid && (
+          {alreadyPaid ? (
+            <div style={{ marginTop: '24px', padding: '24px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', textAlign: 'center' }}>
+              <CheckCircle size={32} color="#10b981" style={{ marginBottom: '12px' }} />
+              <h3 style={{ color: '#10b981', margin: '0 0 8px 0', fontSize: '1.2rem' }}>Payment Proof Received</h3>
+              <p style={{ color: '#e2e8f0', margin: 0, fontSize: '0.95rem' }}>You have already submitted evidence of payment for this case. HR has been notified and no further action is required from you.</p>
+            </div>
+          ) : (
             <form onSubmit={handleSubmit} style={{ marginTop: '24px' }}>
               <h3 style={{ fontSize: '1rem', marginBottom: '12px', color: '#e2e8f0' }}>
                 <Upload size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />

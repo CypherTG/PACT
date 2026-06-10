@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Users, 
-  AlertTriangle, 
-  ShieldAlert, 
+import {
+  Users,
+  AlertTriangle,
+  ShieldAlert,
   TrendingUp,
   Plus
 } from 'lucide-react';
@@ -42,7 +42,7 @@ export const DashboardPage: React.FC = () => {
     const handleMailEvent = (e: any) => {
       if (!e.detail || !e.detail.to) return;
       const recipientStr = Array.isArray(e.detail.to) ? e.detail.to.join(', ') : String(e.detail.to);
-      
+
       setMailLogs(prev => [
         { id: Date.now(), to: recipientStr, subject: e.detail.subject || 'No Subject', time: new Date().toLocaleTimeString() },
         ...prev
@@ -60,11 +60,11 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="dashboard-container">
         <div className="kpi-grid">
-          {[1,2,3,4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{height: '100px'}}></div>)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{ height: '100px' }}></div>)}
         </div>
-        <div className="dashboard-charts-grid" style={{marginTop: '2rem'}}>
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
+        <div className="dashboard-charts-grid" style={{ marginTop: '2rem' }}>
+          <div className="chart-panel glass-panel skeleton" style={{ height: '400px' }}></div>
+          <div className="chart-panel glass-panel skeleton" style={{ height: '400px' }}></div>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
         </div>
-        
+
         <div className="kpi-card glass-panel">
           <div className="kpi-icon warning"><AlertTriangle size={24} /></div>
           <div className="kpi-content">
@@ -121,21 +121,21 @@ export const DashboardPage: React.FC = () => {
         {/* Compliance Trend Line Chart */}
         <div className="chart-panel glass-panel">
           <div className="panel-header">
-            <h3><TrendingUp size={18}/> Compliance Breach Trends</h3>
+            <h3><TrendingUp size={18} /> Compliance Breach Trends</h3>
           </div>
           <div className="chart-wrapper">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={stats.casesByMonth} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorO" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#e94560" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#e94560" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#e94560" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#e94560" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{fill: 'var(--text-secondary)'}} />
-                <YAxis stroke="var(--text-secondary)" tick={{fill: 'var(--text-secondary)'}} />
-                <RechartsTooltip 
+                <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} />
+                <YAxis stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} />
+                <RechartsTooltip
                   contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-light)', borderRadius: '8px' }}
                   itemStyle={{ color: 'var(--text-primary)' }}
                 />
@@ -158,8 +158,8 @@ export const DashboardPage: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" horizontal={false} />
                 <XAxis type="number" stroke="var(--text-secondary)" />
                 <YAxis dataKey="department" type="category" stroke="var(--text-secondary)" width={100} />
-                <RechartsTooltip 
-                  cursor={{fill: 'rgba(0,0,0,0.03)'}}
+                <RechartsTooltip
+                  cursor={{ fill: 'rgba(0,0,0,0.03)' }}
                   contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-light)', borderRadius: '8px' }}
                 />
                 <Legend />
@@ -194,7 +194,7 @@ export const DashboardPage: React.FC = () => {
         <div className="activity-panel glass-panel" data-testid="dashboard-mail-log">
           <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Mail size={18} color="var(--primary)"/> Mail Notification Log
+              <Mail size={18} color="var(--primary)" /> Mail Notification Log
             </h3>
             <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>Real-time</span>
           </div>

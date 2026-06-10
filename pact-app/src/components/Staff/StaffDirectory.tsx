@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { sharePointService } from '../../services/SharePointService';
 import type { StaffMember } from '../../config/types';
@@ -8,6 +8,7 @@ export const StaffDirectory: React.FC = () => {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterDept, setFilterDept] = useState('All');
 
   useEffect(() => {
     sharePointService.getStaffDirectory().then(data => {
@@ -16,10 +17,16 @@ export const StaffDirectory: React.FC = () => {
     });
   }, []);
 
-  const filteredStaff = staff.filter(s => 
-    s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Derive unique departments for the dropdown
+  const departments = Array.from(new Set(staff.map(s => s.department).filter(Boolean))).sort();
+
+  const filteredStaff = staff.filter(s => {
+    const matchesSearch =
+      s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDept = filterDept === 'All' || s.department === filterDept;
+    return matchesSearch && matchesDept;
+  });
 
   if (loading) {
     return (
@@ -43,9 +50,17 @@ export const StaffDirectory: React.FC = () => {
           />
         </div>
         <div className="cases-actions">
-          <button className="btn btn-secondary">
-            <Filter size={16} /> Filter by Dept
-          </button>
+          <select
+            className="btn btn-secondary"
+            style={{ appearance: 'none', cursor: 'pointer', outline: 'none' }}
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+          >
+            <option value="All">All Departments</option>
+            {departments.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
         </div>
       </div>
 

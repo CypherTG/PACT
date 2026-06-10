@@ -13,8 +13,7 @@ const RESPONSE_PAGE_CLASS = 'pact-response-active';
  */
 export const ResponseLayout: React.FC<ResponseLayoutProps> = ({ children }) => {
   useEffect(() => {
-    document.documentElement.classList.add(RESPONSE_PAGE_CLASS);
-    return () => document.documentElement.classList.remove(RESPONSE_PAGE_CLASS);
+    return () => {};
   }, []);
 
   return (

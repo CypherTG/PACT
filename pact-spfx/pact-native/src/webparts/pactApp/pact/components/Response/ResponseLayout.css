@@ -3,34 +3,33 @@
    Standalone layout without sidebar navigation
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Full viewport backdrop (fixed — escapes SharePoint / web part width hacks) */
+/* Full viewport backdrop (fixed when standalone, but container-friendly inside SP) */
 .response-layout {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
+  position: relative;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: clamp(16px, 4vw, 32px) clamp(12px, 3vw, 24px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  min-height: calc(100vh - 120px);
   background-color: #0a0a12;
   background-image: linear-gradient(135deg, #0a0a12 0%, #111827 40%, #0f172a 100%);
-  background-attachment: fixed;
   background-size: cover;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: #e2e8f0;
   box-sizing: border-box;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  margin-top: 10px;
 }
 
 /* Centered content column — never stretches past this width */
 .response-shell {
   position: relative;
   z-index: 1;
-  width: min(100%, 34rem);
-  max-width: 34rem;
-  flex: 0 0 auto;
+  width: 100%;
+  max-width: 38rem;
+  flex: 0 1 auto;
   margin: 0 auto;
   min-width: 0;
   box-sizing: border-box;
@@ -39,20 +38,21 @@
   gap: 0;
 }
 
-/* SharePoint web part host: allow fixed layout to cover viewport */
+/* SharePoint web part host override: keep it clean and inline */
 .pact-full-width-container .response-layout,
 .pact-response-route .response-layout {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  max-width: none !important;
-  margin: 0 !important;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  inset: auto !important;
+  height: auto !important;
 }
 
 .pact-full-width-container .response-shell,
 .pact-response-route .response-shell {
-  width: min(calc(100vw - 32px), 34rem) !important;
-  max-width: 34rem !important;
+  width: 100% !important;
+  max-width: 38rem !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }
@@ -61,8 +61,7 @@ html.pact-response-active,
 html.pact-response-active body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  height: 100%;
+  overflow: auto;
   background: #0a0a12;
 }
 

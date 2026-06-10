@@ -9,18 +9,33 @@ export const CasesListPage: React.FC = () => {
   const [cases, setCases] = useState<ComplianceCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  const getSafeDate = (d: string) => {
+    if (!d) return 'N/A';
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
+  };
 
   useEffect(() => {
-    sharePointService.getCases().then(data => {
-      setCases(data);
-      setLoading(false);
-    });
+    const fetchData = () => {
+      sharePointService.getCases().then(data => {
+        setCases(data);
+        setLoading(false);
+      });
+    };
+    
+    fetchData();
+    window.addEventListener('pact-data-changed', fetchData);
+    return () => window.removeEventListener('pact-data-changed', fetchData);
   }, []);
 
-  const filteredCases = cases.filter(c => 
-    (c.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (c.chargedPersonName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCases = cases.filter(c => {
+    const matchesSearch = (c.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (c.chargedPersonName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === 'All' || c.status === filterStatus;
+    return matchesSearch && matchesFilter;
+  });
 
   if (loading) {
     return (
@@ -45,9 +60,20 @@ export const CasesListPage: React.FC = () => {
           />
         </div>
         <div className="cases-actions">
-          <button type="button" className="btn btn-secondary" data-testid="cases-filter-button">
-            <Filter size={16} /> Filter
-          </button>
+          <select 
+            className="btn btn-secondary" 
+            style={{ appearance: 'none', cursor: 'pointer', outline: 'none' }}
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            data-testid="cases-filter-select"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Unpaid">Unpaid</option>
+            <option value="Paid">Paid</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Appeal Pending">Appeal Pending</option>
+            <option value="Waived">Waived</option>
+          </select>
           <NavLink to="/cases/new" className="btn btn-primary" data-testid="cases-new-button">
             <Plus size={16} /> New Case
           </NavLink>
@@ -79,7 +105,7 @@ export const CasesListPage: React.FC = () => {
                   </td>
                   <td>{c.department}</td>
                   <td>{c.offenceCategoryName || 'Unknown'}</td>
-                  <td>{new Date(c.dueDate).toLocaleDateString()}</td>
+                  <td>{getSafeDate(c.dueDate)}</td>
                   <td>
                     <span className={`status-badge status-${(c.status || '').toLowerCase().replace(/\s+/g, '')}`}>
                       {c.status}

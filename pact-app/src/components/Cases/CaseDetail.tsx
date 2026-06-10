@@ -1,29 +1,35 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, useParams, useNavigate } from 'react-router-dom';
+import { NavLink, useParams, useHistory } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Clock, User, AlertTriangle } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { ComplianceCase } from '../../config/types';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const history = useHistory();
   const [caseData, setCaseData] = useState<ComplianceCase | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // In a real app, we'd fetch the specific case.
-    // For now, we fetch all and find it.
-    sharePointService.getCases().then(cases => {
-      const found = cases.find(c => c.id === id);
-      if (found) setCaseData(found);
-      setLoading(false);
-    });
+    const fetchCase = () => {
+      // In a real app, we'd fetch the specific case.
+      // For now, we fetch all and find it.
+      sharePointService.getCases().then(cases => {
+        const found = cases.find(c => c.id === id);
+        if (found) setCaseData(found);
+        setLoading(false);
+      });
+    };
+
+    fetchCase();
+    window.addEventListener('pact-data-changed', fetchCase);
+    return () => window.removeEventListener('pact-data-changed', fetchCase);
   }, [id]);
 
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to permanently delete this incident?")) {
       await sharePointService.deleteCase(caseData!.id);
-      navigate('/cases');
+      history.push('/cases');
     }
   };
 
@@ -36,12 +42,23 @@ export const CaseDetail: React.FC = () => {
   if (loading) return <div className="glass-panel" style={{padding: '40px', textAlign: 'center'}}>Loading case details...</div>;
   if (!caseData) return <div className="glass-panel" style={{padding: '40px', textAlign: 'center'}}>Case not found.</div>;
 
+  const getSafeDate = (d: string) => {
+    if (!d) return 'Just now';
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? 'Just now' : parsed.toLocaleDateString();
+  };
+  const getSafeDateTime = (d: string) => {
+    if (!d) return 'Just now';
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? 'Just now' : parsed.toLocaleString();
+  };
+
   return (
     <div className="cases-container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <div className="cases-header" style={{ marginBottom: '16px' }}>
-        <NavLink to="/cases" className="btn btn-secondary">
+        <button className="btn btn-secondary" onClick={() => history.push('/cases')}>
           <ArrowLeft size={16} /> Back to Cases
-        </NavLink>
+        </button>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" onClick={handleDelete} style={{color: 'var(--status-danger)', borderColor: 'rgba(220,38,38,0.2)'}}>
             Delete Incident
@@ -79,16 +96,16 @@ export const CaseDetail: React.FC = () => {
               <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{caseData.title}</h2>
               <span className={`status-badge status-${caseData.status.toLowerCase().replace(/\s+/g, '')}`}>{caseData.status}</span>
             </div>
-            <p className="text-secondary" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={14} /> Created on {new Date(caseData.dateCreated).toLocaleDateString()}
-            </p>
-          </div>
+              <p className="text-secondary" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={14} /> Created on {getSafeDate(caseData.dateCreated)}
+              </p>
+            </div>
 
           <div style={{ textAlign: 'right' }}>
             <p className="text-secondary" style={{ margin: '0 0 4px', fontSize: '0.85rem', textTransform: 'uppercase' }}>Penalty Amount</p>
             <h3 style={{ margin: 0, fontSize: '1.8rem', color: 'var(--text-primary)' }}>₦{caseData.penaltyAmount.toLocaleString()}</h3>
             <p className="text-secondary" style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
-              Due: <strong style={{color: new Date(caseData.dueDate) < new Date() ? 'var(--status-danger)' : 'var(--text-primary)'}}>{new Date(caseData.dueDate).toLocaleDateString()}</strong>
+              Due: <strong style={{color: new Date(caseData.dueDate) < new Date() ? 'var(--status-danger)' : 'var(--text-primary)'}}>{getSafeDate(caseData.dueDate)}</strong>
             </p>
           </div>
         </div>
@@ -154,7 +171,7 @@ export const CaseDetail: React.FC = () => {
               <div>
                 <p style={{ margin: '0 0 4px', color: 'var(--text-primary)', fontWeight: 500 }}>Case Registered & Penalty Issued</p>
                 <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Penalty of ₦{caseData.penaltyAmount} applied based on Tier 1 Policy Matrix.</p>
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>{new Date(caseData.dateCreated).toLocaleString()} by System</p>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>{getSafeDateTime(caseData.dateCreated)} by System</p>
               </div>
             </div>
             
@@ -168,7 +185,7 @@ export const CaseDetail: React.FC = () => {
                     Auto-Escalation Warning
                   </p>
                   <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>This individual has 2 prior Tier 1 offences. Further breaches will result in Tier 2 escalation.</p>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>{new Date(caseData.dateCreated).toLocaleString()} by PACT Escalation Engine</p>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>{getSafeDateTime(caseData.dateCreated)} by PACT Escalation Engine</p>
                 </div>
               </div>
             )}

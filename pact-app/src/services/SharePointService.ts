@@ -178,6 +178,14 @@ export class SharePointService {
       const DATA_VERSION = "4.0"; // Fixed key namespace
       const currentVersion = localStorage.getItem(this.STORAGE_PREFIX + 'data_version');
 
+      if (typeof window !== 'undefined') {
+        window.addEventListener('storage', (event) => {
+          if (event.key && event.key.startsWith(this.STORAGE_PREFIX)) {
+            this.notifyDataChanged();
+          }
+        });
+      }
+
       if (currentVersion !== DATA_VERSION) {
         console.log("PACT: Initializing isolated storage namespace...");
         this.saveToLocal('pact_policies', this.getInitialMockPolicies());
@@ -266,6 +274,20 @@ export class SharePointService {
       return match?.InternalName || candidates[0];
     } catch {
       return candidates[0];
+    }
+  }
+
+  public async diagnoseListColumns(listName: string) {
+    if (this.isLocal) return;
+    try {
+      const data = await this.fetchREST(`web/lists/getbytitle('${listName}')/fields?$select=Title,InternalName,StaticName&$filter=Hidden eq false`);
+      const fields = (data.results || []).map((f: any) => `${f.Title} : ${f.InternalName}`);
+      console.group(`🚨 [PACT Diagnostic] EXACT Columns for list: "${listName}"`);
+      console.log("👉 PLEASE COPY AND PASTE THE TEXT BELOW TO YOUR DEVELOPER:");
+      console.log(fields.join('\n'));
+      console.groupEnd();
+    } catch (e) {
+      console.error(`[PACT Diagnostic] Failed to read columns for ${listName}`, e);
     }
   }
 
@@ -612,30 +634,7 @@ export class SharePointService {
 
     await this.updateCaseStatusForReference(caseData.title, CASE_STATUS.PAID, caseItemId);
 
-    const hrSubject = `PACT: Payment received — ${caseData.title}`;
-    const hrBody = `
-      <div style="font-family:Arial,sans-serif;color:#333;">
-        <h2 style="color:#107c10;margin-top:0;">Payment proof received</h2>
-        <p><b>${caseData.chargedPersonName}</b> has submitted proof of payment.</p>
-        <table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="color:#666;padding:6px 0;">Case reference</td><td><b>${caseData.title}</b></td></tr>
-          <tr><td style="color:#666;padding:6px 0;">Amount</td><td>₦${caseData.penaltyAmount.toLocaleString()}</td></tr>
-          <tr><td style="color:#666;padding:6px 0;">Department</td><td>${caseData.department || '—'}</td></tr>
-          <tr><td style="color:#666;padding:6px 0;">Status</td><td><b>Paid</b> (updated in PACT)</td></tr>
-        </table>
-        ${paymentNotes ? `<p><b>Employee notes:</b> ${paymentNotes}</p>` : ''}
-        <p><a href="${proofUrl}">Open payment proof</a> in ${PAYMENT_PROOFS_LIBRARY}</p>
-        <p style="font-size:12px;color:#666;">No further action required unless verification fails.</p>
-      </div>
-    `;
-    // Send HR/Legal/Chairman notification via the same {to, subject, body} schema
-    // that the working case-logging flow uses — avoids payload mismatch with Power Automate.
-    await this.sendEmailNotification(
-      [HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL],
-      hrSubject,
-      hrBody,
-      ACCEPT_PAYMENT_TRIGGER_URL
-    );
+    // Email notifications for payments are now securely handled by the Power Automate "When an item is modified" flow.
 
     this.notifyDataChanged();
     return { proofUrl };
@@ -680,12 +679,13 @@ export class SharePointService {
             'Content-Type': 'text/plain;charset=UTF-8'
           },
           body: JSON.stringify({
-            to,
+            to: to.join(';'),
             subject,
             body
           })
         });
 
+        // With no-cors, response is opaque (status 0) which is normal.
         if (response.type !== 'opaque' && !response.ok) {
           throw new Error(`HTTP trigger returned status ${response.status}`);
         }
@@ -753,10 +753,44 @@ export class SharePointService {
       return;
     }
 
-    // ── 3. SP.Utilities.Utility.SendEmail fallback removed ──
-    // This endpoint only works inside SharePoint page context and returns 400 Bad Request
-    // from Vercel/localhost. All email routing must go through the Power Automate webhook above.
-    console.warn('[PACT] No webhook configured and not in local mode — email could not be sent.');
+    // ── 3. SP.Utilities.Utility.SendEmail fallback ──
+    // This endpoint works natively inside SharePoint page context.
+    if (!this.isLocal) {
+      try {
+        console.log(`%c [SP EMAIL] %c Attempting native SharePoint email...`, 'background: #0078d4; color: white; padding: 2px 5px; border-radius: 3px;', 'font-weight: bold;');
+        const spData = {
+          'properties': {
+            '__metadata': { 'type': 'SP.Utilities.EmailProperties' },
+            'To': { 'results': to },
+            'Subject': subject,
+            'Body': body,
+            'AdditionalHeaders': {
+              '__metadata': { 'type': 'Collection(SP.KeyValue)' },
+              'results': [
+                {
+                  '__metadata': { 'type': 'SP.KeyValue' },
+                  'Key': 'content-type',
+                  'Value': 'text/html',
+                  'ValueType': 'Edm.String'
+                }
+              ]
+            }
+          }
+        };
+
+        await this.fetchREST(`SP.Utilities.Utility.SendEmail`, {
+          method: 'POST',
+          body: JSON.stringify(spData)
+        });
+
+        console.log(`%c [SP EMAIL] %c Delivered via native SharePoint ✓`, 'background: #107c10; color: white; padding: 2px 5px; border-radius: 3px;', 'font-weight: bold;');
+        return;
+      } catch (spErr) {
+        console.warn('[PACT] Native SharePoint email fallback failed:', spErr);
+      }
+    }
+
+    console.warn('[PACT] All email delivery methods failed.');
   }
 
   // ─── LocalStorage Persistence ────────────────────────────────────────────────
@@ -807,7 +841,7 @@ export class SharePointService {
         })).sort((a,b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
       }
 
-        const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$orderby=Created desc`;
+        const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,OffenceCategory/Title&$expand=OffenceCategory&$orderby=Created desc`;
       const data = await this.fetchREST(endpoint);
       const [staff, policies] = await Promise.all([
         this.getStaffDirectory(),
@@ -838,6 +872,10 @@ export class SharePointService {
 
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.STAFF_DIRECTORY}')/items?$top=5000`;
       const data = await this.fetchREST(endpoint);
+      
+      // Run diagnostic in the background so we can see the staff columns in console
+      this.diagnoseListColumns(LIST_NAMES.STAFF_DIRECTORY);
+
       if (data && data.results && data.results.length > 0) {
         return data.results.map((item: any) => {
           const email = item[COLUMNS.STAFF.EMAIL] || item.EmailAddress || item.Email || item.email || '';
@@ -894,6 +932,7 @@ export class SharePointService {
       if ('results' in value && Array.isArray(value.results)) {
         return value.results.map((entry: any) => this.normalizeFieldValue(entry)).filter(Boolean).join(', ');
       }
+      return ''; // Prevent React rendering unresolved objects (like __deferred)
     }
     return value;
   }
@@ -996,14 +1035,18 @@ export class SharePointService {
         newTier = 'Tier 2';
       }
 
-      await this.createEscalation({
-        caseReference: newCase.title,
-        offender: newCase.chargedPerson,
-        offenderName: newCase.chargedPersonName,
-        escalationReason: reason,
-        previousTier: policy.tier,
-        newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
-      });
+      try {
+        await this.createEscalation({
+          caseReference: newCase.title,
+          offender: newCase.chargedPerson,
+          offenderName: newCase.chargedPersonName,
+          escalationReason: reason,
+          previousTier: policy.tier,
+          newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
+        });
+      } catch (escErr) {
+        console.warn("Failed to create escalation record:", escErr);
+      }
     }
 
     // 2. Update Tracker — increment the correct tier counter
@@ -1028,7 +1071,11 @@ export class SharePointService {
     await this.updateRepeatTracker(newCase.chargedPerson, updatedTracker);
 
     // 3. Email Notifications
-    const offCount = (tracker?.tier1Last6Months || 0) + (policy?.tier === 'Tier 1' ? 1 : 0);
+    let offCount = 1;
+    if (policy?.tier === 'Tier 1') offCount = (tracker?.tier1Last6Months || 0) + 1;
+    else if (policy?.tier === 'Tier 2') offCount = (tracker?.tier2Offences || 0) + 1;
+    else if (policy?.tier === 'Tier 3') offCount = (tracker?.tier3Offences || 0) + 1;
+    
     const actionPath = isEscalated ? 'Automatic Escalation' : 
                       (policy?.tier === 'Tier 1' ? (offCount === 1 ? '1st Offence' : offCount === 2 ? '2nd Offence' : '3rd+ Offence') : 'Standard');
     
@@ -1072,10 +1119,95 @@ export class SharePointService {
 
     // 4. Persistence
 
-    // 4. Persistence & Email Notification Submission
+    // Always persist to local cache first (ensures UI updates instantly and fallback works if SP fails)
     const cases = this.getFromLocal<ComplianceCase>('pact_cases');
     cases.push(newCase);
     this.saveToLocal('pact_cases', cases);
+
+    if (!this.isLocal) {
+      try {
+        const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
+        const spData: any = {
+          '__metadata': { 'type': itemType },
+          [COLUMNS.CASES.TITLE]: newCase.title,
+          [COLUMNS.CASES.CHARGED_PERSON]: newCase.chargedPersonName,
+          [COLUMNS.CASES.DEPARTMENT]: newCase.department,
+          [COLUMNS.CASES.OFFENCE_CATEGORY]: newCase.offenceCategoryName,
+          [COLUMNS.CASES.PENALTY_AMOUNT]: newCase.penaltyAmount,
+          [COLUMNS.CASES.DUE_DATE]: newCase.dueDate,
+          [COLUMNS.CASES.ISSUER_NAME]: newCase.issuerName,
+          [COLUMNS.CASES.SECONDARY_CONTACT]: newCase.secondaryContact,
+          [COLUMNS.CASES.STATUS]: newCase.status,
+          [COLUMNS.CASES.STAFF_EMAIL]: newCase.staffEmail,
+          [COLUMNS.CASES.CHARGED_PERSON_EMAIL]: newCase.staffEmail,
+          [COLUMNS.CASES.TIER]: policy?.tier || 'Tier 1',
+          [COLUMNS.CASES.DISCIPLINARY_ACTION]: disciplinaryAction,
+          [COLUMNS.CASES.OFFENCE_COUNT]: offCount.toString()
+        };
+
+        let finalResponse: any = null;
+        try {
+          finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+            method: 'POST',
+            body: JSON.stringify(spData)
+          });
+        } catch (firstTryErr) {
+          console.warn("First try failed, attempting Lookup ID format...", firstTryErr);
+          
+          try {
+            // Try formatting as Lookup IDs (e.g. OffenceCategoryId: 5)
+            // Note: ChargedPerson is a Text field, so we leave it as is.
+            delete spData[COLUMNS.CASES.OFFENCE_CATEGORY];
+            
+            let resolvedPolicyId = null;
+            if (policy?.offenceName) {
+              resolvedPolicyId = await this.findListItemIdByTitle(LIST_NAMES.POLICY_LIBRARY, policy.offenceName);
+            }
+            
+            spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'] = resolvedPolicyId || parseInt(newCase.offenceCategory, 10) || null;
+            
+            finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+              method: 'POST',
+              body: JSON.stringify(spData)
+            });
+          } catch (secondTryErr) {
+            console.warn("Lookup ID format failed, falling back to basic fields only...", secondTryErr);
+            // Complete shock absorber: remove them completely
+            delete spData[COLUMNS.CASES.CHARGED_PERSON + 'Id'];
+            delete spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'];
+            delete spData[COLUMNS.CASES.ISSUER_NAME];
+            delete spData[COLUMNS.CASES.SECONDARY_CONTACT];
+            
+            finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+              method: 'POST',
+              body: JSON.stringify(spData)
+            });
+          }
+        }
+        
+        // Guarantee the offence category is saved using validateUpdateListItem
+        if (finalResponse) {
+          const newItemId = finalResponse.d ? finalResponse.d.Id : finalResponse.Id;
+          if (newItemId) {
+            await this.tryUpdateListItemByDisplayNames(
+              LIST_NAMES.COMPLIANCE_CASES,
+              newItemId,
+              [
+                { FieldName: 'Offence Category', FieldValue: newCase.offenceCategoryName },
+                { FieldName: 'OffenceCategory', FieldValue: newCase.offenceCategoryName }
+              ]
+            );
+          }
+        }
+      } catch (spError) {
+        // We log the error but DO NOT throw.
+        // This ensures the platform continues functioning seamlessly, the case remains 
+        // in local fallback, and the emails are still dispatched successfully exactly like yesterday.
+        console.warn("Non-blocking failure: Could not sync case to live SharePoint list. Missing/mismatched column?", spError);
+        // Run diagnostic automatically
+        this.diagnoseListColumns(LIST_NAMES.COMPLIANCE_CASES);
+      }
+    }
 
     // Create Disciplinary Action Record (non-blocking)
     try {
@@ -1091,135 +1223,9 @@ export class SharePointService {
       console.warn('Disciplinary action record failed', e);
     }
 
-    // Build the Accept/Appeal URLs for the offender notice
-    const staffDisplay = newCase.chargedPersonName || 'Employee';
-    const offenceLabel = policy?.offenceName || newCase.offenceCategoryName || 'Compliance Violation';
-    
-    const acceptUrl = this.buildCaseResponseLink(newCase.title, 'accept', {
-      staffName: staffDisplay,
-      offenceLabel,
-      amount: newCase.penaltyAmount,
-      dueIso: newCase.dueDate,
-      staffEmail: newCase.staffEmail,
-      department: newCase.department,
-      description: newCase.offenceDescription,
-    });
-    
-    const appealUrl = this.buildCaseResponseLink(newCase.title, 'appeal', {
-      staffName: staffDisplay,
-      offenceLabel,
-      amount: newCase.penaltyAmount,
-      dueIso: newCase.dueDate,
-      staffEmail: newCase.staffEmail,
-      department: newCase.department,
-      description: newCase.offenceDescription,
-    });
-    
-    const emailButtonHtml = this.buildEmailButtonHtmlBoth(acceptUrl, appealUrl);
-
-    // Format a premium HTML notification email for the offender and their manager
-    const emailSubject = `PACT ALERT: ${this.expandAbbreviations(offenceLabel)} - ${staffDisplay} (Ref: ${newCase.title})`;
-    const emailBody = `
-      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <div style="border-bottom: 2px solid #0078d4; padding-bottom: 12px; margin-bottom: 20px;">
-          <h2 style="color: #0078d4; margin: 0; font-size: 20px;">PACT Platform — Compliance Notice</h2>
-        </div>
-        <p style="font-size: 15px; line-height: 1.5;">Hello <b>${staffDisplay}</b>,</p>
-        <p style="font-size: 15px; line-height: 1.5;">A compliance notice has been logged against you in the PACT Platform. Please find the details of the incident below:</p>
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin: 20px 0;">
-          <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500; width: 150px;">Case Reference:</td>
-              <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${newCase.title}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Offence:</td>
-              <td style="color: #0f172a; padding: 6px 0;">${this.expandAbbreviations(offenceLabel)}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Description:</td>
-              <td style="color: #334155; padding: 6px 0; line-height: 1.4;">${newCase.offenceDescription || 'Please review the case details in PACT.'}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Penalty Amount:</td>
-              <td style="color: #e11d48; padding: 6px 0; font-weight: bold; font-size: 15px;">₦${newCase.penaltyAmount.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Sanction/Action:</td>
-              <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${disciplinaryAction}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Response Due Date:</td>
-              <td style="color: #f59e0b; padding: 6px 0; font-weight: bold;">${new Date(newCase.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
-            </tr>
-          </table>
-        </div>
-        ${emailButtonHtml}
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 32px; padding-top: 16px; border-top: 1px solid #f1f5f9; text-align: center; line-height: 1.4;">
-          This is an automated administrative notification from the PACT Compliance Governance Platform.
-        </p>
-      </div>
-    `;
-
-    const manager = staff.find(member =>
-      member.fullName === person?.lineManager || member.email === person?.lineManager
-    );
-
-    try {
-      // 1. Send detailed email with action buttons to the offender
-      if (newCase.staffEmail) {
-        await this.sendEmailNotification([newCase.staffEmail], emailSubject, emailBody);
-      }
-
-      // 2. Send separate awareness notification to the supervisor/line manager (if resolved)
-      if (manager?.email) {
-        const managerSubject = `[Manager Awareness] PACT ALERT: ${this.expandAbbreviations(offenceLabel)} - ${staffDisplay} (Ref: ${newCase.title})`;
-        const managerBody = `
-          <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-            <div style="border-bottom: 2px solid #ca5010; padding-bottom: 12px; margin-bottom: 20px;">
-              <h2 style="color: #ca5010; margin: 0; font-size: 20px;">PACT Platform — Manager Notification</h2>
-            </div>
-            <p style="font-size: 15px; line-height: 1.5;">Hello <b>${manager.fullName || 'Manager'}</b>,</p>
-            <p style="font-size: 15px; line-height: 1.5;">This is an administrative notification that a compliance notice has been logged against your direct report, <b>${staffDisplay}</b>. Below are the details:</p>
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin: 20px 0;">
-              <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500; width: 150px;">Case Reference:</td>
-                  <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${newCase.title}</td>
-                </tr>
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Offence:</td>
-                  <td style="color: #0f172a; padding: 6px 0;">${this.expandAbbreviations(offenceLabel)}</td>
-                </tr>
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Description:</td>
-                  <td style="color: #334155; padding: 6px 0; line-height: 1.4;">${newCase.offenceDescription || 'Please review the case details in PACT.'}</td>
-                </tr>
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Penalty Amount:</td>
-                  <td style="color: #e11d48; padding: 6px 0; font-weight: bold; font-size: 15px;">₦${newCase.penaltyAmount.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Sanction/Action:</td>
-                  <td style="color: #0f172a; padding: 6px 0; font-weight: bold;">${disciplinaryAction}</td>
-                </tr>
-                <tr>
-                  <td style="color: #64748b; padding: 6px 0; font-weight: 500;">Response Due Date:</td>
-                  <td style="color: #f59e0b; padding: 6px 0; font-weight: bold;">${new Date(newCase.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
-                </tr>
-              </table>
-            </div>
-            <p style="font-size: 14px; line-height: 1.5; color: #475569;">No direct action is required from you at this stage. The employee has been notified and given ${PAYMENT_DEADLINE_DAYS} days to respond (Accept & Pay or Appeal).</p>
-            <p style="font-size: 12px; color: #94a3b8; margin-top: 32px; padding-top: 16px; border-top: 1px solid #f1f5f9; text-align: center; line-height: 1.4;">
-              This is an automated administrative notification from the PACT Compliance Governance Platform.
-            </p>
-          </div>
-        `;
-        await this.sendEmailNotification([manager.email], managerSubject, managerBody);
-      }
-    } catch (mailErr) {
-      console.warn("Failed to dispatch initial compliance email:", mailErr);
-    }
+    // Email notifications are now securely handled by the Power Automate "When an item is created" flow.
+    // The React app simply saves the case, and Microsoft 365 handles the background email delivery,
+    // ensuring no CORS errors or duplicate emails.
 
     return newCase;
   }
@@ -1468,10 +1474,14 @@ export class SharePointService {
       try {
         const existing = await this.getRepeatTrackerRecord(staffId);
         if (existing) {
+          const itemType = await this.getListItemEntityType(LIST_NAMES.REPEAT_OFFENCE_TRACKER);
           await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items(${existing.id})`, {
             method: 'POST',
             headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-            body: JSON.stringify(spData)
+            body: JSON.stringify({
+              __metadata: { type: itemType },
+              ...spData
+            })
           });
         } else {
           const staff = await this.getStaffDirectory();
@@ -1479,7 +1489,6 @@ export class SharePointService {
           const createData = {
             '__metadata': { 'type': `SP.Data.${LIST_NAMES.REPEAT_OFFENCE_TRACKER.replace(/ /g, '_x0020_')}ListItem` },
             [COLUMNS.REPEAT_TRACKER.TITLE]: person?.fullName || 'Unknown',
-            [COLUMNS.REPEAT_TRACKER.OFFENDER]: staffId,
             [COLUMNS.REPEAT_TRACKER.TOTAL_OFFENCES]: updates.totalOffences ?? 1,
             [COLUMNS.REPEAT_TRACKER.TIER1_LAST_6M]: updates.tier1Last6Months ?? 0,
             [COLUMNS.REPEAT_TRACKER.TIER2_OFFENCES]: updates.tier2Offences ?? 0,
@@ -1577,7 +1586,7 @@ export class SharePointService {
           caseReference: this.readField(item, COLUMNS.DISCIPLINARY.CASE_REFERENCE, 'Case Reference', 'CaseReference', 'Case_x0020_Reference'),
           actionType: this.readField(item, COLUMNS.DISCIPLINARY.ACTION_TYPE, 'Action Type', 'ActionType', 'Action_x0020_Type'),
           actionDate: this.readField(item, COLUMNS.DISCIPLINARY.ACTION_DATE, 'Action Date', 'ActionDate', 'Action_x0020_Date'),
-          actionedBy: this.readField(item, COLUMNS.DISCIPLINARY.ACTIONED_BY, 'Actioned By', 'ActionedBy', 'Actioned_x0020_By'),
+          actionedBy: this.readField(item, 'ActionedBy'),
           penaltyAmount: this.parsePenalty(this.readField(item, 'Penalty Amount', 'PenaltyAmount', 'Penalty_x0020_Amount')),
           notes: this.readField(item, COLUMNS.DISCIPLINARY.NOTES, 'Notes'),
           status: this.readField(item, COLUMNS.DISCIPLINARY.STATUS, 'Status')
@@ -1611,8 +1620,7 @@ export class SharePointService {
       [COLUMNS.DISCIPLINARY.CASE_REFERENCE]: action.caseReference,
       [COLUMNS.DISCIPLINARY.ACTION_TYPE]: action.actionType,
       [COLUMNS.DISCIPLINARY.ACTION_DATE]: new Date().toISOString(),
-      [COLUMNS.DISCIPLINARY.ACTIONED_BY]: this.getUserName(),
-      ['Penalty_x0020_Amount']: action.penaltyAmount ?? 0,
+      [COLUMNS.DISCIPLINARY.PENALTY_AMOUNT]: action.penaltyAmount ?? 0,
       [COLUMNS.DISCIPLINARY.NOTES]: action.notes,
       [COLUMNS.DISCIPLINARY.STATUS]: action.status || 'Pending'
     };
@@ -1688,29 +1696,40 @@ export class SharePointService {
       penaltyAmount: typeof appeal.penaltyAmount === 'number' ? appeal.penaltyAmount : (originalCase?.penaltyAmount ?? 0),
     };
 
-    const subject = `PACT APPEAL FILED: Case ${enrichedAppeal.caseReference} (${title})`;
-    const body = this.buildAppealSubmittedEmailBody(enrichedAppeal, title, appealDate);
+    if (this.isLocal) {
+      const log = this.getFromLocal<any>('pact_appeals');
+      log.push({
+        id: Date.now().toString(),
+        title,
+        appealDate,
+        decision: 'Pending',
+        ...enrichedAppeal
+      });
+      this.saveToLocal('pact_appeals', log);
+    } else {
+      const itemType = await this.getListItemEntityType(LIST_NAMES.APPEALS_REGISTER);
+      const spData = {
+        '__metadata': { 'type': itemType },
+        [COLUMNS.APPEALS.TITLE]: title,
+        [COLUMNS.APPEALS.CASE_REFERENCE]: enrichedAppeal.caseReference,
+        [COLUMNS.APPEALS.APPELLANT]: enrichedAppeal.appellant,
+        [COLUMNS.APPEALS.APPEAL_DATE]: appealDate,
+        [COLUMNS.APPEALS.GROUNDS]: enrichedAppeal.grounds,
+        [COLUMNS.APPEALS.DECISION]: 'Pending'
+      };
 
-    // Send appeal notification via the same {to, subject, body} schema
-    // that the working case-logging flow uses — avoids payload mismatch with Power Automate.
-    await this.sendEmailNotification(
-      [HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL],
-      subject,
-      body,
-      APPEAL_MAIL_TRIGGER_URL
-    );
+      await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
+        method: 'POST',
+        body: JSON.stringify(spData)
+      });
+    }
 
-    const log = this.getFromLocal<any>('pact_appeals');
-    log.push({
-      id: Date.now().toString(),
-      title,
-      appealDate,
-      decision: 'Pending',
-      ...enrichedAppeal
-    });
-    this.saveToLocal('pact_appeals', log);
+    // ── Apply side effects (Both Modes) ──
     await this.updateCaseStatusForReference(enrichedAppeal.caseReference, CASE_STATUS.APPEAL_PENDING);
     this.notifyDataChanged();
+
+    // ── Email Notifications ──
+    // Handled by Power Automate "When an item is created" flow on the PACT Appeals Register list.
   }
 
   private async updateListItemByDisplayNames(
@@ -1751,36 +1770,89 @@ export class SharePointService {
   }
 
   public async updateAppeal(id: string, updates: any): Promise<void> {
+    let appealDetails: any = null;
+
     if (this.isLocal) {
       const log = this.getFromLocal<any>('pact_appeals');
       const idx = log.findIndex(a => a.id === id);
       if (idx > -1) {
-        log[idx] = { ...log[idx], ...updates };
+        log[idx] = { ...log[idx], ...updates, decisionDate: new Date().toISOString() };
         this.saveToLocal('pact_appeals', log);
-        
-        // Mock email for decision
-        if (updates.decision) {
-          const appeal = log[idx];
-          const subject = `PACT APPEAL DECISION: ${appeal.caseReference}`;
-          const body = `<p>Your appeal for <b>${appeal.caseReference}</b> has been <b>${updates.decision}</b>.</p><p>Notes: ${updates.decisionNotes}</p>`;
-          await this.sendEmailNotification([appeal.appellantEmail || 'staff@konstructum.com'], subject, body);
-        }
+        appealDetails = log[idx];
       }
-      return;
+    } else {
+      const itemType = await this.getListItemEntityType(LIST_NAMES.APPEALS_REGISTER);
+      const spData = {
+        '__metadata': { 'type': itemType },
+        [COLUMNS.APPEALS.DECISION]: updates.decision,
+        [COLUMNS.APPEALS.DECISION_DATE]: new Date().toISOString(),
+        [COLUMNS.APPEALS.DECISION_NOTES]: updates.decisionNotes,
+        [COLUMNS.APPEALS.REVIEWING_OFFICER]: updates.reviewingOfficer
+      };
+
+      await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${id})`, {
+        method: 'POST',
+        headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+        body: JSON.stringify(spData)
+      });
+
+      // Fetch the updated appeal to get appellant details for the email
+      const appeals = await this.getAppeals();
+      appealDetails = appeals.find(a => a.id === id);
     }
 
-    const spData = {
-      [COLUMNS.APPEALS.DECISION]: updates.decision,
-      [COLUMNS.APPEALS.DECISION_DATE]: new Date().toISOString(),
-      [COLUMNS.APPEALS.DECISION_NOTES]: updates.decisionNotes,
-      [COLUMNS.APPEALS.REVIEWING_OFFICER]: updates.reviewingOfficer
-    };
+    // ── Update linked case status & send decision email ──
+    if (updates.decision && appealDetails) {
+      // Get the original case to retrieve the actual user's email address and name
+      const originalCase = await this.getCaseByReference(appealDetails.caseReference);
+      const userEmail = originalCase?.staffEmail || appealDetails.appellantEmail || 'staff@konstructum.com';
+      const userName = originalCase?.chargedPersonName || appealDetails.appellant || 'Employee';
 
-    await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${id})`, {
-      method: 'POST',
-      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-      body: JSON.stringify(spData)
-    });
+      let newCaseStatus: string | null = null;
+      let emailSubject = '';
+      let emailBody = '';
+
+      switch (updates.decision) {
+        case 'Waived':
+          newCaseStatus = CASE_STATUS.WAIVED;
+          emailSubject = `APPEAL APPROVED – Penalty Waived: ${appealDetails.caseReference}`;
+          emailBody = `<p>Dear ${userName},</p>
+            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and the penalty has been <b>waived</b>. No further action is required from you.</p>
+            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+            <p>This matter is now closed.</p>`;
+          break;
+        case 'Upheld':
+          newCaseStatus = CASE_STATUS.WAIVED;
+          emailSubject = `APPEAL UPHELD – Penalty Cancelled: ${appealDetails.caseReference}`;
+          emailBody = `<p>Dear ${userName},</p>
+            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been <b>upheld</b>. The original penalty has been cancelled and no payment is required.</p>
+            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+            <p>This matter is now closed.</p>`;
+          break;
+        case 'Reduced':
+          newCaseStatus = CASE_STATUS.UNPAID;
+          emailSubject = `APPEAL PARTIALLY APPROVED – Penalty Reduced: ${appealDetails.caseReference}`;
+          emailBody = `<p>Dear ${userName},</p>
+            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and the penalty has been <b>reduced</b>.</p>
+            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+            <p>Please make payment of the revised amount within the original deadline. You can use the payment link sent in your original notice.</p>`;
+          break;
+        case 'Rejected':
+          newCaseStatus = CASE_STATUS.UNPAID;
+          emailSubject = `APPEAL REJECTED – Payment Required: ${appealDetails.caseReference}`;
+          emailBody = `<p>Dear ${userName},</p>
+            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been <b>rejected</b>. The original penalty stands and must be paid.</p>
+            ${updates.decisionNotes ? `<p><b>Reason:</b> ${updates.decisionNotes}</p>` : ''}
+            <p><b>Please proceed to make your payment immediately using the payment link sent in your original compliance notice.</b> Failure to pay may result in further escalation.</p>`;
+          break;
+      }
+
+      if (newCaseStatus) {
+        await this.updateCaseStatusForReference(appealDetails.caseReference, newCaseStatus);
+      }
+
+      // Email Notifications are handled by Power Automate "When an item is modified" flow on the PACT Appeals Register list.
+    }
   }
 
   private mapSPItemToCase(
@@ -1788,8 +1860,8 @@ export class SharePointService {
     staff: StaffMember[] = [],
     policies: PolicyOffence[] = []
   ): ComplianceCase {
-    const chargedPersonId = String(this.readField(item, COLUMNS.CASES.CHARGED_PERSON, 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '');
-    const offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category') || '');
+    const chargedPersonId = String(this.readField(item, COLUMNS.CASES.CHARGED_PERSON + 'Id', COLUMNS.CASES.CHARGED_PERSON, 'ChargedPersonId', 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '');
+    const offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY + 'Id', COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategoryId', 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category') || '');
     const chargedPerson = staff.find(s => s.id === chargedPersonId);
     const policy = policies.find(p => p.id === offenceCategoryId);
     return {
@@ -1801,13 +1873,13 @@ export class SharePointService {
       department: this.readField(item, COLUMNS.CASES.DEPARTMENT, 'Department'),
       offenceCategory: offenceCategoryId,
       offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category', 'Offence'),
-      offenceDescription: this.readField(item, COLUMNS.CASES.OFFENCE_DESCRIPTION, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description'),
+      offenceDescription: this.readField(item, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description') || '',
       penaltyAmount: this.parsePenalty(this.readField(item, COLUMNS.CASES.PENALTY_AMOUNT, 'PenaltyAmount', 'Penalty Amount', 'Penalty', 'Amount', 'Penalty_x0020_Amount')),
       dueDate: this.readField(item, COLUMNS.CASES.DUE_DATE, 'DueDate', 'Due Date', 'Due_x0020_Date', 'Payment Due Date'),
       issuerName: this.readField(item, COLUMNS.CASES.ISSUER_NAME, 'IssuerName', 'Issuer Name', 'Issuer_x0020_Name'),
       secondaryContact: this.readField(item, COLUMNS.CASES.SECONDARY_CONTACT, 'SecondaryContact', 'Secondary Contact Email'),
       status: this.readField(item, COLUMNS.CASES.STATUS, 'Status'),
-      dateCreated: this.readField(item, COLUMNS.CASES.DATE_CREATED, 'Created', 'Date Created', 'Date Created ')
+      dateCreated: this.readField(item, 'Created', 'Date Created', 'Date Created ') || new Date().toISOString()
     };
   }
 

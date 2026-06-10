@@ -166,7 +166,7 @@ export const NewCaseForm: React.FC = () => {
             >
               <option value="">-- Select Offender --</option>
               {staff.map(member => (
-                <option key={member.id} value={member.id}>{member.fullName} ({member.department})</option>
+                <option key={member.id} value={member.id}>{member.fullName}</option>
               ))}
             </select>
           </div>
