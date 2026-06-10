@@ -15,7 +15,7 @@ export const CaseDetail: React.FC = () => {
       // In a real app, we'd fetch the specific case.
       // For now, we fetch all and find it.
       sharePointService.getCases().then(cases => {
-        const found = cases.find(c => c.id === id);
+        const found = cases.find(c => c.id === id || c.title === id);
         if (found) setCaseData(found);
         setLoading(false);
       });
@@ -60,14 +60,17 @@ export const CaseDetail: React.FC = () => {
           <ArrowLeft size={16} /> Back to Cases
         </button>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-secondary" onClick={handleDelete} style={{color: 'var(--status-danger)', borderColor: 'rgba(220,38,38,0.2)'}}>
-            Delete Incident
-          </button>
+          {sharePointService.getUserName() !== caseData.chargedPersonName && (
+            <button className="btn btn-secondary" onClick={handleDelete} style={{color: 'var(--status-danger)', borderColor: 'rgba(220,38,38,0.2)'}}>
+              Delete Incident
+            </button>
+          )}
           <select 
             value={caseData.status} 
             onChange={handleStatusChange}
+            disabled={sharePointService.getUserName() === caseData.chargedPersonName}
             className="btn btn-primary"
-            style={{ appearance: 'none', cursor: 'pointer', outline: 'none' }}
+            style={{ appearance: 'none', cursor: sharePointService.getUserName() === caseData.chargedPersonName ? 'not-allowed' : 'pointer', outline: 'none', opacity: sharePointService.getUserName() === caseData.chargedPersonName ? 0.7 : 1 }}
           >
             <option value="Unpaid">Status: Unpaid</option>
             <option value="Overdue">Status: Overdue</option>
@@ -128,7 +131,7 @@ export const CaseDetail: React.FC = () => {
               </div>
             </div>
             
-            <button className="btn btn-secondary" style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
+            <button className="btn btn-secondary" onClick={() => history.push(`/staff/${caseData.chargedPerson}`)} style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
               <User size={16} /> View Full Profile & History
             </button>
           </div>

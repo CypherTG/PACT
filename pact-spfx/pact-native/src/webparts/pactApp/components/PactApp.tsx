@@ -271,8 +271,8 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
           ) : (
             <div className="pact-startup-container">
               <div className="pact-startup-card">
-                <div className="pact-startup-logo">
-                  K
+                <div className="pact-startup-logo" style={{ overflow: 'hidden', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
+                  <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
                 <h2 className="pact-startup-title">PACT Portal</h2>
                 <div className="pact-startup-subtitle">Konstructum</div>

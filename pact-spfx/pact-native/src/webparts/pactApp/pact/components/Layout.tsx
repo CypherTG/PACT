@@ -51,7 +51,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                   const parent = (e.target as HTMLImageElement).parentElement;
                   if (parent) {
-                    parent.innerText = 'P';
+                    parent.innerText = 'PACT';
+                    parent.style.fontSize = '0.9rem';
                     parent.style.background = 'linear-gradient(135deg, var(--primary), #ff6b35)';
                     parent.style.display = 'flex';
                     parent.style.alignItems = 'center';

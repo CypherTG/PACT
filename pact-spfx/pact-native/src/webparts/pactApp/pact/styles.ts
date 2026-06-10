@@ -97,25 +97,31 @@ a:hover { color: var(--primary-hover); }
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary), #d2334e);
-  color: white;
-  box-shadow: var(--shadow-glow);
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
-  transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+  background: var(--primary-hover);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+  filter: brightness(1.05);
 }
 
 .btn-secondary {
-  background: white;
+  background: #ffffff;
   color: var(--text-primary);
   border: 1px solid var(--border-light);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.btn-secondary:hover { background: var(--bg-surface-hover); }
+.btn-secondary:hover { 
+  background: var(--bg-surface-hover); 
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
 
 .fade-in { animation: fadeIn 0.4s ease-out forwards; }
 .skeleton {

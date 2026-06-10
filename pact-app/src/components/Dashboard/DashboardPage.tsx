@@ -21,6 +21,34 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mailLogs, setMailLogs] = useState<any[]>([]);
 
+  // System Diagnostics States
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [selectedDiagnosticList, setSelectedDiagnosticList] = useState('PACT Compliance Cases');
+  const [diagnosticResult, setDiagnosticResult] = useState<string>('');
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
+
+  const runColumnDiagnostic = async () => {
+    setDiagnosticLoading(true);
+    try {
+      const res = await sharePointService.getListColumnsDiagnostic(selectedDiagnosticList);
+      setDiagnosticResult(res.join('\n'));
+    } catch (e) {
+      setDiagnosticResult(String(e));
+    }
+    setDiagnosticLoading(false);
+  };
+
+  const runFirstItemDiagnostic = async () => {
+    setDiagnosticLoading(true);
+    try {
+      const res = await sharePointService.getRawFirstItemDiagnostic(selectedDiagnosticList);
+      setDiagnosticResult(res);
+    } catch (e) {
+      setDiagnosticResult(String(e));
+    }
+    setDiagnosticLoading(false);
+  };
+
   const loadDashboard = () => {
     sharePointService.getDashboardStats().then(data => {
       setStats(data);
@@ -220,6 +248,111 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Collapsible Diagnostics Panel */}
+      <div className="glass-panel" style={{ marginTop: '2rem', padding: '1.5rem', border: '1px dashed rgba(255,255,255,0.1)' }}>
+        <div 
+          onClick={() => setShowDiagnostics(!showDiagnostics)} 
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        >
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', color: 'var(--text-secondary)' }}>
+            ⚙️ System Diagnostics & Schema Inspector (UAT Debug Tool)
+          </h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>
+            {showDiagnostics ? '▲ Hide Diagnostics' : '▼ Show Diagnostics'}
+          </span>
+        </div>
+
+        {showDiagnostics && (
+          <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>1. Environment Context</h4>
+                <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}><td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>App Runtime Mode:</td><td style={{ fontWeight: 600 }}>{sharePointService.getRuntimeLabel()}</td></tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}><td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>Is Local Standalone:</td><td style={{ fontWeight: 600 }}>{sharePointService.isStandalone() ? 'Yes (Demo Mocks)' : 'No (SharePoint Native)'}</td></tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}><td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>Logged In User:</td><td style={{ fontWeight: 600 }}>{sharePointService.getCurrentSession()?.email || 'N/A'}</td></tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}><td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>Site Domain:</td><td style={{ fontWeight: 600, wordBreak: 'break-all' }}>{sharePointService.getCurrentSession()?.siteTitle || 'N/A'}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>2. SharePoint List Selector</h4>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+                  <select 
+                    value={selectedDiagnosticList}
+                    onChange={e => setSelectedDiagnosticList(e.target.value)}
+                    style={{ 
+                      flex: 1, 
+                      padding: '8px', 
+                      background: 'rgba(0,0,0,0.2)', 
+                      border: '1px solid var(--border-light)', 
+                      borderRadius: '6px', 
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="PACT Compliance Cases">PACT Compliance Cases</option>
+                    <option value="PACT Policy & Offence Library">PACT Policy & Offence Library</option>
+                    <option value="PACT Staff Directory">PACT Staff Directory</option>
+                    <option value="PACT Repeat Offence Tracker">PACT Repeat Offence Tracker</option>
+                    <option value="PACT Appeals Register">PACT Appeals Register</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={runColumnDiagnostic} 
+                    className="btn btn-secondary" 
+                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                    disabled={diagnosticLoading}
+                  >
+                    Inspect Columns Schema
+                  </button>
+                  <button 
+                    onClick={runFirstItemDiagnostic} 
+                    className="btn btn-secondary" 
+                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                    disabled={diagnosticLoading}
+                  >
+                    View Raw First Item
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {diagnosticResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Diagnostic Output for list: "{selectedDiagnosticList}"</span>
+                  <button 
+                    onClick={() => { navigator.clipboard.writeText(diagnosticResult); alert('Copied to clipboard!'); }}
+                    className="link-action"
+                    style={{ fontSize: '0.8rem', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--primary)', padding: 0 }}
+                  >
+                    Copy Output
+                  </button>
+                </div>
+                <pre style={{ 
+                  background: 'rgba(0,0,0,0.4)', 
+                  padding: '1rem', 
+                  borderRadius: '6px', 
+                  overflow: 'auto', 
+                  maxHeight: '300px', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  color: '#a7f3d0',
+                  border: '1px solid var(--border-light)',
+                  margin: 0
+                }}>
+                  {diagnosticLoading ? 'Running diagnostics...' : diagnosticResult}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

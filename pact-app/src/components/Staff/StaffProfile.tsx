@@ -22,8 +22,15 @@ export const StaffProfile: React.FC = () => {
 
     setLoading(true);
     Promise.all([
-      sharePointService.getStaffDirectory().then(list => (Array.isArray(list) ? list.find((s: StaffMember) => s.id === id) : null) || null),
-      sharePointService.getCases().then(list => (Array.isArray(list) ? list.filter((c: ComplianceCase) => c.chargedPerson === id) : [])),
+      sharePointService.getStaffDirectory().then(staffList => {
+        const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === id || s.fullName === id) || null : null;
+        return memberRecord;
+      }),
+      sharePointService.getCases().then(list => (Array.isArray(list) ? list.filter((c: ComplianceCase) => 
+        c.chargedPerson === id || 
+        c.chargedPersonName === id ||
+        (c.chargedPersonName && id && c.chargedPersonName.toLowerCase() === id.toLowerCase())
+      ) : [])),
       sharePointService.getDisciplinaryActions().then(list => (Array.isArray(list) ? list : [])),
       sharePointService.getRepeatTrackerRecord(id || '')
     ]).then(([m, c, a, t]) => {

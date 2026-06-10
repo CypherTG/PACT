@@ -841,7 +841,7 @@ export class SharePointService {
         })).sort((a,b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
       }
 
-        const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,OffenceCategory/Title&$expand=OffenceCategory&$orderby=Created desc`;
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,OffenceCategory/Id,OffenceCategory/Title,FieldValuesAsText/*&$expand=OffenceCategory,FieldValuesAsText&$orderby=Created desc`;
       const data = await this.fetchREST(endpoint);
       const [staff, policies] = await Promise.all([
         this.getStaffDirectory(),
@@ -911,8 +911,38 @@ export class SharePointService {
 
   // --- Policies ---
   public async getPolicyLibrary(): Promise<PolicyOffence[]> {
-    // ALWAYS use local JSON data for now as requested
-    return policyData as PolicyOffence[];
+    try {
+      if (this.isLocal) {
+        return policyData as PolicyOffence[];
+      }
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.POLICY_LIBRARY}')/items?$top=500`;
+      const data = await this.fetchREST(endpoint);
+      if (data && data.results && data.results.length > 0) {
+        return data.results.map((item: any) => {
+          const liveTitle = item.Title || '';
+          const localMatch = (policyData as PolicyOffence[]).find(
+            p => p.offenceName.toLowerCase().trim() === liveTitle.toLowerCase().trim()
+          );
+
+          return {
+            id: String(item.Id || item.ID || ''),
+            offenceName: liveTitle,
+            tier: item.Tier || localMatch?.tier || 'Tier 1',
+            category: item.Category || localMatch?.category || '',
+            description: localMatch?.description || '',
+            defaultPenaltyAmount: this.parsePenalty(item.DefaultPenaltyAmount ?? localMatch?.defaultPenaltyAmount ?? 0),
+            firstOffenceAction: item.FirstOffenceAction || localMatch?.firstOffenceAction || '',
+            secondOffenceAction: item.SecondOffenceAction || localMatch?.secondOffenceAction || '',
+            thirdOffenceAction: item.ThirdOffenceAction || localMatch?.thirdOffenceAction || '',
+            escalationTrigger: localMatch?.escalationTrigger ?? true
+          };
+        });
+      }
+      return policyData as PolicyOffence[];
+    } catch (error) {
+      console.warn("Failed to fetch policy library from SharePoint, falling back to local JSON", error);
+      return policyData as PolicyOffence[];
+    }
   }
 
   private parsePenalty(value: any): number {
@@ -981,7 +1011,7 @@ export class SharePointService {
     const staff = this.isLocal ? this.getFromLocal<StaffMember>('pact_staff') : await this.getStaffDirectory();
     const person = staff.find(s => s.id === caseData.chargedPerson);
     const policies = this.isLocal ? this.getFromLocal<PolicyOffence>('pact_policies') : await this.getPolicyLibrary();
-    const policy = policies.find(p => p.id === caseData.offenceCategory);
+    const policy = policies.find(p => p.id === caseData.offenceCategory || p.id === 'p' + caseData.offenceCategory);
 
     const newCase: ComplianceCase = {
       id: newId,
@@ -1861,9 +1891,32 @@ export class SharePointService {
     policies: PolicyOffence[] = []
   ): ComplianceCase {
     const chargedPersonId = String(this.readField(item, COLUMNS.CASES.CHARGED_PERSON + 'Id', COLUMNS.CASES.CHARGED_PERSON, 'ChargedPersonId', 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '');
-    const offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY + 'Id', COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategoryId', 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category') || '');
-    const chargedPerson = staff.find(s => s.id === chargedPersonId);
-    const policy = policies.find(p => p.id === offenceCategoryId);
+    
+    let offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY + 'Id', 'OffenceCategoryId', 'OffenceCategoryVal') || '');
+    if (!offenceCategoryId) {
+      const offObj = item[COLUMNS.CASES.OFFENCE_CATEGORY] || item['OffenceCategory'] || item['Offence_x0020_Category'];
+      if (offObj && typeof offObj === 'object') {
+        offenceCategoryId = String(offObj.Id || offObj.ID || '');
+      }
+    }
+    if (!offenceCategoryId) {
+      offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category') || '');
+    }
+    const chargedPerson = staff.find(s => s.id === chargedPersonId || s.fullName === chargedPersonId || (s.fullName && chargedPersonId && s.fullName.toLowerCase() === chargedPersonId.toLowerCase()));
+
+    let rawOffence = item.FieldValuesAsText ? (item.FieldValuesAsText[COLUMNS.CASES.OFFENCE_CATEGORY] || item.FieldValuesAsText['OffenceCategory'] || item.FieldValuesAsText['Offence_x0020_Category'] || item.FieldValuesAsText['Offence']) : '';
+    if (!rawOffence) {
+      rawOffence = this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category', 'Offence');
+    }
+    const offenceStr = rawOffence ? (typeof rawOffence === 'object' ? (rawOffence.Title || rawOffence.LookupValue || '') : String(rawOffence)) : '';
+
+    const policy = policies.find(p => 
+      p.id === offenceCategoryId || 
+      p.id === 'p' + offenceCategoryId || 
+      p.id === offenceCategoryId.replace(/^p/, '') ||
+      (offenceStr && p.offenceName.toLowerCase().trim() === offenceStr.toLowerCase().trim())
+    );
+
     return {
       id: item.ID.toString(),
       title: this.readField(item, COLUMNS.CASES.TITLE, 'Penalty ID', 'Case ID', 'CaseID', 'Title'),
@@ -1872,7 +1925,7 @@ export class SharePointService {
       staffEmail: this.readField(item, COLUMNS.CASES.STAFF_EMAIL, 'StaffEmail', 'Email', 'Charged Person Email', 'Staff Email'),
       department: this.readField(item, COLUMNS.CASES.DEPARTMENT, 'Department'),
       offenceCategory: offenceCategoryId,
-      offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category', 'Offence'),
+      offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : offenceStr,
       offenceDescription: this.readField(item, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description') || '',
       penaltyAmount: this.parsePenalty(this.readField(item, COLUMNS.CASES.PENALTY_AMOUNT, 'PenaltyAmount', 'Penalty Amount', 'Penalty', 'Amount', 'Penalty_x0020_Amount')),
       dueDate: this.readField(item, COLUMNS.CASES.DUE_DATE, 'DueDate', 'Due Date', 'Due_x0020_Date', 'Payment Due Date'),
@@ -1963,6 +2016,39 @@ export class SharePointService {
     return [
       { id: '1', title: 'P-001', caseReference: 'PACT-0945', actionType: 'Written Warning + CBT', actionDate: '2026-04-10T10:00:00Z', actionedBy: 'PACT Admin', status: 'Enforced', notes: 'Legacy seeded example' }
     ];
+  }
+
+  public async getListColumnsDiagnostic(listName: string): Promise<string[]> {
+    if (this.isLocal) {
+      return ["Demo Mode: Columns cannot be diagnosed. Switch to SharePoint mode."];
+    }
+    try {
+      const data = await this.fetchREST(`web/lists/getbytitle('${listName}')/fields?$select=Title,InternalName,TypeAsString,StaticName&$filter=Hidden eq false`);
+      return (data.results || []).map((f: any) => `${f.Title} (${f.TypeAsString}) -> InternalName: "${f.InternalName}"`);
+    } catch (e) {
+      return [`Error: ${e instanceof Error ? e.message : String(e)}`];
+    }
+  }
+
+  public async getRawFirstItemDiagnostic(listName: string): Promise<string> {
+    if (this.isLocal) {
+      return "Demo Mode: Raw items not available.";
+    }
+    try {
+      const endpoint = `web/lists/getbytitle('${listName}')/items?$top=1`;
+      const data = await this.fetchREST(endpoint);
+      const firstItem = (data.results || [])[0];
+      if (!firstItem) return `No items found in list: "${listName}"`;
+      // Clean metadata objects to make output readable
+      const cleanItem = { ...firstItem };
+      delete cleanItem.__metadata;
+      delete cleanItem.AttachmentFiles;
+      delete cleanItem.FirstUniqueAncestorSecurableObject;
+      delete cleanItem.RoleAssignments;
+      return JSON.stringify(cleanItem, null, 2);
+    } catch (e) {
+      return `Error: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 }
 

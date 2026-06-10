@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, ShieldAlert, Mail } from 'lucide-react';
 import './Layout.css';
 import { sharePointService } from '../services/SharePointService';
+import kccLogo from '../assets/kcc-logo.png';
 import { WorkbenchBridge } from './Runtime/WorkbenchBridge';
 
 const navigation = [
@@ -36,8 +37,8 @@ export const Layout: React.FC = () => {
       <aside className="sidebar glass-panel">
         <div className="sidebar-header">
           <div className="logo-container">
-            <img src="./kcc-logo.png" alt="KCC" className="logo-img" style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; const el = document.getElementById('logo-fallback'); if (el) el.style.display = 'flex'; }} />
-            <div id="logo-fallback" className="logo-icon" style={{ display: 'none' }}>P</div>
+            <img src={kccLogo} alt="KCC" className="logo-img" style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; const el = document.getElementById('logo-fallback'); if (el) el.style.display = 'flex'; }} />
+            <div id="logo-fallback" className="logo-icon" style={{ display: 'none', fontSize: '0.9rem' }}>PACT</div>
             <h1 className="logo-text">PACT</h1>
           </div>
         </div>

@@ -29,8 +29,12 @@ export const StaffProfile: React.FC = () => {
         sharePointService.getRepeatTrackerRecord(id || '')
       ]);
 
-      const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === id) || null : null;
-      const personCases = Array.isArray(caseList) ? caseList.filter((c: ComplianceCase) => c.chargedPerson === id) : [];
+      const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === id || s.fullName === id) || null : null;
+      const personCases = Array.isArray(caseList) ? caseList.filter((c: ComplianceCase) => 
+        c.chargedPerson === id || 
+        c.chargedPersonName === id ||
+        (memberRecord && (c.chargedPerson === memberRecord.id || c.chargedPersonName === memberRecord.fullName))
+      ) : [];
       const caseRefs = personCases.map((caseObj: ComplianceCase) => caseObj.title);
       const filteredActions = Array.isArray(actionList)
         ? actionList.filter((action: DisciplinaryAction) => !!action?.caseReference && caseRefs.indexOf(action.caseReference) !== -1)
