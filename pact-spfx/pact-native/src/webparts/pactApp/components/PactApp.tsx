@@ -55,13 +55,15 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, ErrorBo
 
 interface PactAppState {
   isOpen: boolean;
+  currentHash: string;
 }
 
 export default class PactApp extends React.Component<IPactAppProps, PactAppState> {
   constructor(props: IPactAppProps) {
     super(props);
     this.state = {
-      isOpen: false
+      isOpen: false,
+      currentHash: typeof window !== 'undefined' ? window.location.hash : ''
     };
     // Initialize the singleton service with the SPFx context
     SharePointService.init(props.context);
@@ -70,6 +72,9 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
   public async componentDidMount(): Promise<void> {
     if (sharePointService) {
       await sharePointService.initialize();
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', this.handleHashChange);
     }
   }
 
@@ -89,12 +94,18 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
     if (typeof document !== 'undefined') {
       document.body.style.overflow = '';
     }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('hashchange', this.handleHashChange);
+    }
   }
 
+  private handleHashChange = (): void => {
+    this.setState({ currentHash: window.location.hash });
+  };
+
   private isCaseResponseRoute(): boolean {
-    if (typeof window === 'undefined') return false;
-    const hash = window.location.hash || '';
-    const path = window.location.pathname || '';
+    const hash = this.state.currentHash || '';
+    const path = typeof window !== 'undefined' ? window.location.pathname || '' : '';
     return hash.includes('/case-response/') || path.includes('/case-response/');
   }
 
@@ -126,10 +137,8 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
     }
 
     // Check if opened via the "open" hash
-    const isFullApp = typeof window !== 'undefined' && (
-      window.location.hash === '#/open' ||
-      (window.location.hash.startsWith('#/') && window.location.hash !== '#/')
-    );
+    const hash = this.state.currentHash || '';
+    const isFullApp = hash === '#/open' || (hash.startsWith('#/') && hash !== '#/');
 
     // 2. Full PACT Portal view: Render as fullscreen overlay with a Close/Exit header
     if (isFullApp || this.state.isOpen) {
