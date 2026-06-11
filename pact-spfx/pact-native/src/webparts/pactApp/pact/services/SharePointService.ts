@@ -1194,8 +1194,9 @@ export class SharePointService {
           [COLUMNS.CASES.OFFENCE_COUNT]: offCount.toString()
         };
 
+        let finalResponse: any = null;
         try {
-          await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+          finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
             method: 'POST',
             body: JSON.stringify(spData)
           });
@@ -1207,9 +1208,14 @@ export class SharePointService {
             // Note: ChargedPerson is a Text field, so we leave it as is.
             delete spData[COLUMNS.CASES.OFFENCE_CATEGORY];
             
-            spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'] = parseInt(newCase.offenceCategory, 10) || null;
+            let resolvedPolicyId = null;
+            if (policy?.offenceName) {
+              resolvedPolicyId = await this.findListItemIdByTitle(LIST_NAMES.POLICY_LIBRARY, policy.offenceName);
+            }
             
-            await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+            spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'] = resolvedPolicyId || parseInt(newCase.offenceCategory, 10) || null;
+            
+            finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
               method: 'POST',
               body: JSON.stringify(spData)
             });
@@ -1221,10 +1227,25 @@ export class SharePointService {
             delete spData[COLUMNS.CASES.ISSUER_NAME];
             delete spData[COLUMNS.CASES.SECONDARY_CONTACT];
             
-            await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
+            finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
               method: 'POST',
               body: JSON.stringify(spData)
             });
+          }
+        }
+        
+        // Guarantee the offence category is saved using validateUpdateListItem
+        if (finalResponse) {
+          const newItemId = finalResponse.d ? finalResponse.d.Id : finalResponse.Id;
+          if (newItemId) {
+            await this.tryUpdateListItemByDisplayNames(
+              LIST_NAMES.COMPLIANCE_CASES,
+              newItemId,
+              [
+                { FieldName: 'Offence Category', FieldValue: newCase.offenceCategoryName || '' },
+                { FieldName: 'OffenceCategory', FieldValue: newCase.offenceCategoryName || '' }
+              ]
+            );
           }
         }
       } catch (spError) {

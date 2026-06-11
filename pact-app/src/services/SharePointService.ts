@@ -1223,8 +1223,8 @@ export class SharePointService {
               LIST_NAMES.COMPLIANCE_CASES,
               newItemId,
               [
-                { FieldName: 'Offence Category', FieldValue: newCase.offenceCategoryName },
-                { FieldName: 'OffenceCategory', FieldValue: newCase.offenceCategoryName }
+                { FieldName: 'Offence Category', FieldValue: newCase.offenceCategoryName || '' },
+                { FieldName: 'OffenceCategory', FieldValue: newCase.offenceCategoryName || '' }
               ]
             );
           }
