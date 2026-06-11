@@ -277,6 +277,45 @@ export class SharePointService {
     }
   }
 
+  private async filterPayloadToAvailableFields(listName: string, payload: any): Promise<any> {
+    if (this.isLocal || !payload) return payload;
+    try {
+      const data = await this.fetchREST(
+        `web/lists/getbytitle('${this.escapeODataString(listName)}')/fields?$select=InternalName`
+      );
+      const available = new Set<string>((data.results || []).map((f: any) => String(f.InternalName || '')));
+      const filtered: any = {};
+      for (const key of Object.keys(payload)) {
+        if (key === '__metadata') {
+          filtered[key] = payload[key];
+          continue;
+        }
+
+        const isLookupId = key.endsWith('Id') && key.length > 2;
+        const baseKey = isLookupId ? key.slice(0, -2) : key;
+
+        if (available.has(key)) {
+          filtered[key] = payload[key];
+        } else if (isLookupId && available.has(baseKey)) {
+          filtered[key] = payload[key];
+        } else {
+          const match = Array.from(available).find(
+            (f: string) => f.toLowerCase() === key.toLowerCase()
+          );
+          if (match) {
+            filtered[match] = payload[key];
+          } else {
+            console.warn(`[PACT] Column "${key}" does not exist in list "${listName}". Excluding from payload.`);
+          }
+        }
+      }
+      return filtered;
+    } catch (e) {
+      console.warn(`[PACT] Failed to inspect columns for list "${listName}". Sending full payload.`, e);
+      return payload;
+    }
+  }
+
   public async diagnoseListColumns(listName: string) {
     if (this.isLocal) return;
     try {
@@ -1535,13 +1574,15 @@ export class SharePointService {
             }
           }
 
+          const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.REPEAT_OFFENCE_TRACKER, {
+            __metadata: { type: itemType },
+            ...spData
+          });
+
           await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items(${existing.id})`, {
             method: 'POST',
             headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-            body: JSON.stringify({
-              __metadata: { type: itemType },
-              ...spData
-            })
+            body: JSON.stringify(filteredData)
           });
         } else {
           const staff = await this.getStaffDirectory();
@@ -1560,9 +1601,10 @@ export class SharePointService {
           if (person) {
             createData[COLUMNS.REPEAT_TRACKER.OFFENDER + 'Id'] = parseInt(person.id, 10) || null;
           }
+          const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.REPEAT_OFFENCE_TRACKER, createData);
           await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items`, {
             method: 'POST',
-            body: JSON.stringify(createData)
+            body: JSON.stringify(filteredData)
           });
         }
       } catch (e) {
@@ -2014,7 +2056,60 @@ export class SharePointService {
   }
 
   private getInitialMockTrackers(): RepeatOffenceRecord[] {
-    return []; // Start fresh with new IDs
+    return [
+      {
+        id: "tr1",
+        title: "Ugeh Collins",
+        offender: "26",
+        offenderName: "Ugeh Collins",
+        totalOffences: 2,
+        tier1Last6Months: 2,
+        tier2Offences: 0,
+        tier3Offences: 0,
+        riskLevel: "Medium",
+        lastOffenceDate: new Date(Date.now() - 5 * 86400000).toISOString(),
+        escalationDue: false
+      },
+      {
+        id: "tr2",
+        title: "Babatunde Adeleye",
+        offender: "8",
+        offenderName: "Babatunde Adeleye",
+        totalOffences: 2,
+        tier1Last6Months: 2,
+        tier2Offences: 0,
+        tier3Offences: 0,
+        riskLevel: "Medium",
+        lastOffenceDate: new Date(Date.now() - 10 * 86400000).toISOString(),
+        escalationDue: false
+      },
+      {
+        id: "tr3",
+        title: "Muyis Rafiu Bello",
+        offender: "18",
+        offenderName: "Muyis Rafiu Bello",
+        totalOffences: 2,
+        tier1Last6Months: 2,
+        tier2Offences: 0,
+        tier3Offences: 0,
+        riskLevel: "Medium",
+        lastOffenceDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+        escalationDue: false
+      },
+      {
+        id: "tr4",
+        title: "Ugeh Collins (Legacy)",
+        offender: "17",
+        offenderName: "Ugeh Collins",
+        totalOffences: 2,
+        tier1Last6Months: 2,
+        tier2Offences: 0,
+        tier3Offences: 0,
+        riskLevel: "Medium",
+        lastOffenceDate: new Date(Date.now() - 5 * 86400000).toISOString(),
+        escalationDue: false
+      }
+    ];
   }
 
   private getInitialMockEscalations(): EscalationEntry[] {
