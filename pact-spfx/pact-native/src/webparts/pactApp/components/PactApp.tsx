@@ -98,6 +98,7 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
     return hash.includes('/case-response/') || path.includes('/case-response/');
   }
 
+
   public render(): React.ReactElement<IPactAppProps> {
     const { userDisplayName } = this.props;
     const isResponse = this.isCaseResponseRoute();
@@ -113,13 +114,30 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
       );
     }
 
+    // Check if opened via the "open" hash (new tab from launch button)
+    const isFullApp = typeof window !== 'undefined' && (
+      window.location.hash === '#/open' ||
+      window.location.hash.startsWith('#/')  && window.location.hash !== '#/'
+    );
+
+    // If the hash signals full app mode, render inline without the startup card
+    if (isFullApp || this.state.isOpen) {
+      return (
+        <AppContext.Provider value={{ service: sharePointService, userDisplayName }}>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </AppContext.Provider>
+      );
+    }
+
     return (
       <AppContext.Provider value={{
         service: sharePointService,
         userDisplayName
       }}>
         <ErrorBoundary>
-          {/* Custom Styles for Startup Card & Overlay */}
+          {/* Custom Styles for Startup Card */}
           <style>{`
             .pact-startup-container {
               display: flex;
@@ -203,94 +221,34 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
               background: #A02025;
               box-shadow: none;
             }
-            
-            /* Full page overlay layout */
-            .pact-fullscreen-wrapper {
-              position: fixed !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 100vw !important;
-              height: 100vh !important;
-              z-index: 999999 !important;
-              background: #f9fafb !important;
-              overflow: auto !important;
-              display: flex;
-              flex-direction: column;
-            }
-            .pact-fullscreen-banner {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 10px 24px;
-              background: #111827;
-              color: #f3f4f6;
-              font-size: 0.85rem;
-              font-weight: 500;
-              border-bottom: 1px solid rgba(255,255,255,0.05);
-            }
-            .pact-fullscreen-btn-close {
-              background: rgba(255,255,255,0.1);
-              color: white;
-              border: 1px solid rgba(255,255,255,0.15);
-              padding: 6px 16px;
-              border-radius: 6px;
-              font-size: 0.78rem;
-              cursor: pointer;
-              font-weight: 600;
-              transition: all 0.2s ease;
-            }
-            .pact-fullscreen-btn-close:hover {
-              background: rgba(255,255,255,0.2);
-              transform: translateY(-1px);
-            }
-            .pact-fullscreen-content {
-              flex: 1;
-              position: relative;
-            }
           `}</style>
 
-          {this.state.isOpen ? (
-            <div className="pact-fullscreen-wrapper">
-              <div className="pact-fullscreen-banner">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
-                  <span>PACT Client Portal is active and fully functional on all screen sizes.</span>
-                </div>
-                <button 
-                  type="button" 
-                  className="pact-fullscreen-btn-close" 
-                  onClick={() => this.setState({ isOpen: false })}
-                >
-                  Close & Minimize Portal
-                </button>
+          <div className="pact-startup-container">
+            <div className="pact-startup-card">
+              <div className="pact-startup-logo" style={{ overflow: 'hidden', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
+                <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
-              <div className="pact-fullscreen-content">
-                <App />
-              </div>
+              <h2 className="pact-startup-title">PACT Portal</h2>
+              <div className="pact-startup-subtitle">Konstructum</div>
+              <p className="pact-startup-desc">
+                Policy Agreement &amp; Compliance Tracking Platform. Securely manage compliance cases, disciplinary metrics, and mail logs.
+              </p>
+              <button 
+                type="button" 
+                className="pact-startup-btn" 
+                onClick={() => {
+                  // Open the full app in a new browser tab
+                  const baseUrl = window.location.origin + window.location.pathname;
+                  window.open(`${baseUrl}#/open`, '_blank');
+                }}
+              >
+                Open PACT Portal
+              </button>
             </div>
-          ) : (
-            <div className="pact-startup-container">
-              <div className="pact-startup-card">
-                <div className="pact-startup-logo" style={{ overflow: 'hidden', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
-                  <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                </div>
-                <h2 className="pact-startup-title">PACT Portal</h2>
-                <div className="pact-startup-subtitle">Konstructum</div>
-                <p className="pact-startup-desc">
-                  Policy Agreement & Compliance Tracking Platform. Securely manage compliance cases, disciplinary metrics, and mail logs.
-                </p>
-                <button 
-                  type="button" 
-                  className="pact-startup-btn" 
-                  onClick={() => this.setState({ isOpen: true })}
-                >
-                  Open PACT Portal
-                </button>
-              </div>
-            </div>
-          )}
+          </div>
         </ErrorBoundary>
       </AppContext.Provider>
     );
   }
 }
+
