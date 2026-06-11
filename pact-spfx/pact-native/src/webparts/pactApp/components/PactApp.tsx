@@ -103,29 +103,98 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
     const { userDisplayName } = this.props;
     const isResponse = this.isCaseResponseRoute();
 
-    // If it's an employee case response route, render it immediately
+    // 1. Employee Accept/Appeal link: Render as a clean, standalone fullscreen page (covering all SharePoint chrome)
     if (isResponse) {
       return (
         <AppContext.Provider value={{ service: sharePointService, userDisplayName }}>
           <ErrorBoundary>
-            <App />
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 999999,
+              background: '#f4f7fb',
+              overflow: 'auto'
+            }}>
+              <App />
+            </div>
           </ErrorBoundary>
         </AppContext.Provider>
       );
     }
 
-    // Check if opened via the "open" hash (new tab from launch button)
+    // Check if opened via the "open" hash
     const isFullApp = typeof window !== 'undefined' && (
       window.location.hash === '#/open' ||
-      window.location.hash.startsWith('#/')  && window.location.hash !== '#/'
+      (window.location.hash.startsWith('#/') && window.location.hash !== '#/')
     );
 
-    // If the hash signals full app mode, render inline without the startup card
+    // 2. Full PACT Portal view: Render as fullscreen overlay with a Close/Exit header
     if (isFullApp || this.state.isOpen) {
       return (
         <AppContext.Provider value={{ service: sharePointService, userDisplayName }}>
           <ErrorBoundary>
-            <App />
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 999999,
+              background: '#0B0F19',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                background: '#111827',
+                borderBottom: '1px solid #1f2937',
+                padding: '12px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: '#ffffff',
+                fontFamily: 'Segoe UI, sans-serif',
+                boxSizing: 'border-box',
+                height: '56px',
+                flexShrink: 0
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ height: '28px', width: 'auto' }} />
+                  <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '0.5px' }}>PACT Portal Preview</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    this.setState({ isOpen: false });
+                    if (typeof window !== 'undefined') {
+                      window.location.hash = '';
+                    }
+                  }}
+                  style={{
+                    background: '#C0272D',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    boxShadow: 'none'
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = '#A02025')}
+                  onMouseOut={(e) => (e.currentTarget.style.background = '#C0272D')}
+                >
+                  Close Preview
+                </button>
+              </div>
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                <App />
+              </div>
+            </div>
           </ErrorBoundary>
         </AppContext.Provider>
       );
@@ -237,9 +306,7 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
                 type="button" 
                 className="pact-startup-btn" 
                 onClick={() => {
-                  // Open the full app in a new browser tab
-                  const baseUrl = window.location.origin + window.location.pathname;
-                  window.open(`${baseUrl}#/open`, '_blank');
+                  this.setState({ isOpen: true });
                 }}
               >
                 Open PACT Portal
