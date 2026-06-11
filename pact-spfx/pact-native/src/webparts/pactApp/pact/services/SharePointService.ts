@@ -1445,12 +1445,22 @@ export class SharePointService {
 
   public async getRepeatTrackerRecord(staffId: string): Promise<RepeatOffenceRecord | null> {
     try {
-      if (!this.isLocal) {
-        const records = await this.getRepeatTrackerRecords();
-        return records.find(r => r.offender === staffId) || null;
-      }
-      const records = this.getFromLocal<RepeatOffenceRecord>('pact_trackers');
-      return records.find(r => r.offender === staffId) || null;
+      const staff = this.isLocal ? this.getFromLocal<StaffMember>('pact_staff') : await this.getStaffDirectory();
+      const targetStaff = staff.find(s => s.id === staffId || s.fullName === staffId || (s.fullName && staffId && s.fullName.toLowerCase() === staffId.toLowerCase()));
+
+      const records = this.isLocal
+        ? this.getFromLocal<RepeatOffenceRecord>('pact_trackers')
+        : await this.getRepeatTrackerRecords();
+
+      return records.find(r => {
+        if (r.offender === staffId) return true;
+        if (targetStaff) {
+          if (r.offender === targetStaff.id) return true;
+          if (r.offenderName && r.offenderName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim()) return true;
+          if (r.offender && r.offender.toLowerCase().trim() === targetStaff.email.toLowerCase().trim()) return true;
+        }
+        return false;
+      }) || null;
     } catch {
       return null;
     }
@@ -1467,7 +1477,17 @@ export class SharePointService {
       return (data.results || []).map((item: any) => ({
         id: item.ID.toString(),
         title: this.readField(item, COLUMNS.REPEAT_TRACKER.TITLE, 'Title'),
-        offender: this.readField(item, COLUMNS.REPEAT_TRACKER.OFFENDER, 'Offender', 'OffenderId')?.toString?.() || String(this.readField(item, COLUMNS.REPEAT_TRACKER.OFFENDER, 'Offender', 'OffenderId') || ''),
+        offender: (() => {
+          const flatId = item.OffenderId || item.OffenderID;
+          if (flatId !== undefined && flatId !== null) return String(flatId);
+          const obj = item.Offender || item.offender;
+          if (obj && typeof obj === 'object') {
+            const nestedId = obj.Id || obj.ID;
+            if (nestedId !== undefined && nestedId !== null) return String(nestedId);
+          }
+          if (typeof obj === 'string' && obj !== '') return obj;
+          return this.readField(item, COLUMNS.REPEAT_TRACKER.OFFENDER, 'Offender', 'OffenderId')?.toString?.() || String(this.readField(item, COLUMNS.REPEAT_TRACKER.OFFENDER, 'Offender', 'OffenderId') || '');
+        })(),
         offenderName: this.readField(item, COLUMNS.REPEAT_TRACKER.TITLE, 'Title'),
         totalOffences: Number(this.readField(item, COLUMNS.REPEAT_TRACKER.TOTAL_OFFENCES, 'TotalOffences', 'Total Offences') || 0),
         tier1Last6Months: Number(this.readField(item, COLUMNS.REPEAT_TRACKER.TIER1_LAST_6M, 'Tier1Offences', 'Tier1 Offences') || 0),
@@ -1510,7 +1530,7 @@ export class SharePointService {
       this.saveToLocal('pact_trackers', records);
     } else {
       // SP REST Update
-      const spData = {
+      const spData: any = {
         [COLUMNS.REPEAT_TRACKER.TOTAL_OFFENCES]: updates.totalOffences,
         [COLUMNS.REPEAT_TRACKER.TIER1_LAST_6M]: updates.tier1Last6Months,
         [COLUMNS.REPEAT_TRACKER.TIER2_OFFENCES]: updates.tier2Offences,
@@ -1524,6 +1544,16 @@ export class SharePointService {
         const existing = await this.getRepeatTrackerRecord(staffId);
         if (existing) {
           const itemType = await this.getListItemEntityType(LIST_NAMES.REPEAT_OFFENCE_TRACKER);
+          
+          // Heal existing record if OffenderId is missing or not a numeric ID matching staffId
+          if (!existing.offender || isNaN(parseInt(existing.offender, 10))) {
+            const staff = await this.getStaffDirectory();
+            const person = staff.find(s => s.id === staffId);
+            if (person) {
+              spData[COLUMNS.REPEAT_TRACKER.OFFENDER + 'Id'] = parseInt(person.id, 10) || null;
+            }
+          }
+
           await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items(${existing.id})`, {
             method: 'POST',
             headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
@@ -1535,7 +1565,7 @@ export class SharePointService {
         } else {
           const staff = await this.getStaffDirectory();
           const person = staff.find(s => s.id === staffId);
-          const createData = {
+          const createData: any = {
             '__metadata': { 'type': `SP.Data.${LIST_NAMES.REPEAT_OFFENCE_TRACKER.replace(/ /g, '_x0020_')}ListItem` },
             [COLUMNS.REPEAT_TRACKER.TITLE]: person?.fullName || 'Unknown',
             [COLUMNS.REPEAT_TRACKER.TOTAL_OFFENCES]: updates.totalOffences ?? 1,
@@ -1546,6 +1576,9 @@ export class SharePointService {
             [COLUMNS.REPEAT_TRACKER.LAST_OFFENCE_DATE]: updates.lastOffenceDate ?? new Date().toISOString(),
             [COLUMNS.REPEAT_TRACKER.ESCALATION_DUE]: updates.escalationDue ?? false
           };
+          if (person) {
+            createData[COLUMNS.REPEAT_TRACKER.OFFENDER + 'Id'] = parseInt(person.id, 10) || null;
+          }
           await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items`, {
             method: 'POST',
             body: JSON.stringify(createData)
