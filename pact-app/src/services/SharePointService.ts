@@ -175,7 +175,7 @@ export class SharePointService {
 
     try {
       console.log(`[PACT] Initializing SharePoint Service (Mode: ${this.runtimeMode})`);
-      const DATA_VERSION = "4.0"; // Fixed key namespace
+      const DATA_VERSION = "5.0"; // Fixed key namespace
       const currentVersion = localStorage.getItem(this.STORAGE_PREFIX + 'data_version');
 
       if (typeof window !== 'undefined') {
@@ -1472,7 +1472,7 @@ export class SharePointService {
         ? this.getFromLocal<RepeatOffenceRecord>('pact_trackers')
         : await this.getRepeatTrackerRecords();
 
-      return records.find(r => {
+      const existing = records.find(r => {
         if (r.offender === staffId) return true;
         if (targetStaff) {
           if (r.offender === targetStaff.id) return true;
@@ -1480,7 +1480,71 @@ export class SharePointService {
           if (r.offender && r.offender.toLowerCase().trim() === targetStaff.email.toLowerCase().trim()) return true;
         }
         return false;
-      }) || null;
+      });
+
+      if (existing) {
+        return existing;
+      }
+
+      // Self-Healing Sync: Rebuild tracker from Compliance Cases if empty
+      if (!this.isLocal) {
+        const cases = await this.getCases();
+        const staffCases = cases.filter(c => {
+          if (c.chargedPerson === staffId) return true;
+          if (targetStaff && c.chargedPersonName && c.chargedPersonName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim()) return true;
+          return false;
+        });
+
+        if (staffCases.length > 0) {
+          console.log(`[PACT] No tracker found for ${targetStaff?.fullName || staffId}, but found ${staffCases.length} cases. Rebuilding...`);
+          
+          const tier1Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 1'));
+          const tier2Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 2'));
+          const tier3Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 3'));
+
+          const sixMonthsAgo = new Date();
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+          const t1Last6M = tier1Cases.filter(c => new Date(c.dateCreated) >= sixMonthsAgo).length;
+
+          const rebuiltTracker: Partial<RepeatOffenceRecord> = {
+            totalOffences: staffCases.length,
+            tier1Last6Months: t1Last6M,
+            tier2Offences: tier2Cases.length,
+            tier3Offences: tier3Cases.length,
+            lastOffenceDate: staffCases[0]?.dateCreated || new Date().toISOString(),
+            riskLevel: escalationEngine.calculateRiskLevel({
+              id: '', title: '', offender: '',
+              totalOffences: staffCases.length,
+              tier1Last6Months: t1Last6M,
+              tier2Offences: tier2Cases.length,
+              tier3Offences: tier3Cases.length,
+              riskLevel: 'Low',
+              lastOffenceDate: '',
+              escalationDue: false
+            })
+          };
+
+          this.updateRepeatTracker(staffId, rebuiltTracker).catch(err => 
+            console.warn("[PACT] Failed to write back rebuilt tracker", err)
+          );
+
+          return {
+            id: 'rebuilt-' + staffId,
+            title: targetStaff?.fullName || 'Unknown',
+            offender: staffId,
+            offenderName: targetStaff?.fullName || 'Unknown',
+            totalOffences: rebuiltTracker.totalOffences || 0,
+            tier1Last6Months: rebuiltTracker.tier1Last6Months || 0,
+            tier2Offences: rebuiltTracker.tier2Offences || 0,
+            tier3Offences: rebuiltTracker.tier3Offences || 0,
+            riskLevel: rebuiltTracker.riskLevel || 'Low',
+            lastOffenceDate: rebuiltTracker.lastOffenceDate || new Date().toISOString(),
+            escalationDue: false
+          };
+        }
+      }
+
+      return null;
     } catch {
       return null;
     }
