@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, useParams, useHistory } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Clock, User, AlertTriangle } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { ComplianceCase } from '../../config/types';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const history = useHistory();
+  const navigate = useNavigate();
   const [caseData, setCaseData] = useState<ComplianceCase | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +29,7 @@ export const CaseDetail: React.FC = () => {
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to permanently delete this incident?")) {
       await sharePointService.deleteCase(caseData!.id);
-      history.push('/cases');
+      navigate('/cases');
     }
   };
 
@@ -56,7 +56,7 @@ export const CaseDetail: React.FC = () => {
   return (
     <div className="cases-container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <div className="cases-header" style={{ marginBottom: '16px' }}>
-        <button className="btn btn-secondary" onClick={() => history.push('/cases')}>
+        <button className="btn btn-secondary" onClick={() => navigate('/cases')}>
           <ArrowLeft size={16} /> Back to Cases
         </button>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -131,7 +131,7 @@ export const CaseDetail: React.FC = () => {
               </div>
             </div>
             
-            <button className="btn btn-secondary" onClick={() => history.push(`/staff/${caseData.chargedPerson}`)} style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
+            <button className="btn btn-secondary" onClick={() => navigate(`/staff/${caseData.chargedPerson}`)} style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
               <User size={16} /> View Full Profile & History
             </button>
           </div>

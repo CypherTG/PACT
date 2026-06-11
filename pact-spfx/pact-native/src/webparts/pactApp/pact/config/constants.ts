@@ -31,7 +31,10 @@ export const CASE_STATUS = {
  * Set in `.env`: `VITE_RESPONSE_PORTAL_URL=https://your-app.vercel.app`
  * Leave empty to use the current page origin (SharePoint or local dev).
  */
-export const RESPONSE_PORTAL_BASE_URL = readViteEnv('VITE_RESPONSE_PORTAL_URL').trim().replace(/\/$/, '');
+const _envPortalUrl = readViteEnv('VITE_RESPONSE_PORTAL_URL').trim().replace(/\/$/, '');
+export const RESPONSE_PORTAL_BASE_URL = _envPortalUrl.length > 0
+  ? _envPortalUrl
+  : 'https://netorgft13110820.sharepoint.com/sites/KONSTRUCTUM/SitePages/CollabHome.aspx';
 
 /**
  * Accept / Appeal flows are gated: valid only when the URL includes this query (added to every email button link).
@@ -116,14 +119,14 @@ export const COLUMNS = {
   },
   ESCALATION: {
     TITLE: 'Title',
-    CASE_REFERENCE: 'Case_x0020_Reference',
+    CASE_REFERENCE: 'CaseReference',
     OFFENDER: 'Offender',
-    REASON: 'Escalation_x0020_Reason',
-    PREVIOUS_TIER: 'Previous_x0020_Tier',
-    NEW_TIER: 'New_x0020_Tier',
-    TRIGGERED_BY: 'Triggered_x0020_By',
-    DATE: 'Escalation_x0020_Date',
-    NOTIFIED_TO: 'Notified_x0020_To',
+    REASON: 'EscalationReason',
+    PREVIOUS_TIER: 'PreviousTier',
+    NEW_TIER: 'NewTier',
+    TRIGGERED_BY: 'TriggeredBy',
+    DATE: 'EscalationDate',
+    NOTIFIED_TO: 'NotifiedTo',
   },
   APPEALS: {
     TITLE: 'Title',

@@ -300,6 +300,9 @@ export const DashboardPage: React.FC = () => {
                     <option value="PACT Staff Directory">PACT Staff Directory</option>
                     <option value="PACT Repeat Offence Tracker">PACT Repeat Offence Tracker</option>
                     <option value="PACT Appeals Register">PACT Appeals Register</option>
+                    <option value="Escalation Log">Escalation Log</option>
+                    <option value="Disciplinary Actions">Disciplinary Actions</option>
+                    <option value="PACT Mail History">PACT Mail History</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>

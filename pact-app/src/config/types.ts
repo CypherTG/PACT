@@ -21,6 +21,7 @@ export interface ComplianceCase {
   status: 'Unpaid' | 'Paid' | 'Overdue' | 'Waived' | 'Acknowledged' | 'Appeal Pending';
   dateCreated: string;
   evidence?: string;
+  tier?: 'Tier 1' | 'Tier 2' | 'Tier 3';
 }
 
 // ─── List 02: Staff Directory ───────────────────────────────────────────────

@@ -20,6 +20,8 @@ export class SharePointService {
   private readonly REST_TIMEOUT_MS = 20000;
   private static _instance: SharePointService | null = null;
   private _spfxContext: any = null;
+  private _caseMappingLogged = false;
+  private _escalationDiagLogged = false;
 
   // Called by the SPFx WebPart to inject context before React renders
   public static init(context: any): void {
@@ -285,6 +287,8 @@ export class SharePointService {
       );
       const available = new Set<string>((data.results || []).map((f: any) => String(f.InternalName || '')));
       const filtered: any = {};
+      const normalize = (s: string) => s.toLowerCase().replace(/[\s_]/g, '').replace(/x0020/g, '');
+
       for (const key of Object.keys(payload)) {
         if (key === '__metadata') {
           filtered[key] = payload[key];
@@ -299,13 +303,27 @@ export class SharePointService {
         } else if (isLookupId && available.has(baseKey)) {
           filtered[key] = payload[key];
         } else {
+          // Try normalized comparison (removes spaces, underscores, x0020)
+          const normKey = normalize(key);
           const match = Array.from(available).find(
-            (f: string) => f.toLowerCase() === key.toLowerCase()
+            (f: string) => normalize(f) === normKey
           );
+
           if (match) {
             filtered[match] = payload[key];
+          } else if (isLookupId) {
+            // Check if normalized base key matches an available lookup base key
+            const normBaseKey = normalize(baseKey);
+            const baseMatch = Array.from(available).find(
+              (f: string) => normalize(f) === normBaseKey
+            );
+            if (baseMatch) {
+              filtered[baseMatch + 'Id'] = payload[key];
+            } else {
+              console.warn(`[PACT] Column "${key}" (lookup) does not exist in list "${listName}". Excluding.`);
+            }
           } else {
-            console.warn(`[PACT] Column "${key}" does not exist in list "${listName}". Excluding from payload.`);
+            console.warn(`[PACT] Column "${key}" does not exist in list "${listName}". Excluding.`);
           }
         }
       }
@@ -613,28 +631,26 @@ export class SharePointService {
       if (resolved) caseItemId = resolved;
     }
     if (!Number.isFinite(caseItemId)) {
-      console.warn(`Case not found in SharePoint for status update: ${caseReference}`);
-      return;
+      console.warn(`[PACT] Case not found in SharePoint for status update: ${caseReference}`);
+      throw new Error(`Case not found in SharePoint for status update: ${caseReference}`);
     }
 
     try {
-      const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
-      await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items(${caseItemId})`, {
-        method: 'POST',
-        headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-        body: JSON.stringify({
-          __metadata: { type: itemType },
-          [COLUMNS.CASES.STATUS]: status
-        })
-      });
-    } catch {
+      // Use the standard robust updateCase method to handle MERGE and dynamic schema filtering
+      await this.updateCase(String(caseItemId), { status: status as any });
+      console.log(`[PACT] Status successfully updated to "${status}" for case ${caseReference}`);
+    } catch (err) {
+      console.warn(`[PACT] Direct updateCase failed for case ${caseReference}, falling back to validateUpdateListItem:`, err);
       const saved = await this.tryUpdateListItemByDisplayNames(
         LIST_NAMES.COMPLIANCE_CASES,
         caseItemId!,
         [{ FieldName: 'Status', FieldValue: status }]
       );
       if (!saved) {
-        console.warn(`Could not set case status "${status}" for ${caseReference}`);
+        console.error(`[PACT] Critical: Could not update status to "${status}" for case ${caseReference}`);
+        throw new Error(`Failed to update case status in SharePoint for ${caseReference}. Both MERGE and validateUpdateListItem failed.`);
+      } else {
+        console.log(`[PACT] Status successfully updated to "${status}" for case ${caseReference} via validateUpdateListItem`);
       }
     }
   }
@@ -918,8 +934,32 @@ export class SharePointService {
 
   // --- Get Case by Reference (e.g. PACT-001) ---
   public async getCaseByReference(ref: string): Promise<ComplianceCase | null> {
-    const cases = await this.getCases();
-    return cases.find(c => c.title === ref) || null;
+    if (this.isLocal) {
+      const cases = await this.getCases();
+      return cases.find(c => c.title === ref) || null;
+    }
+
+    try {
+      const safeRef = this.escapeODataString(ref.trim());
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$filter=Title eq '${safeRef}'&$select=*,FieldValuesAsText/*&$expand=FieldValuesAsText&$top=1`;
+      const data = await this.fetchREST(endpoint);
+      const item = (data.results || [])[0];
+      if (!item) {
+        console.warn(`[PACT] Case reference "${ref}" not found via OData query. Falling back to full list search.`);
+        const cases = await this.getCases();
+        return cases.find(c => c.title === ref) || null;
+      }
+
+      const [staff, policies] = await Promise.all([
+        this.getStaffDirectory(),
+        this.getPolicyLibrary()
+      ]);
+      return this.mapSPItemToCase(item, staff, policies);
+    } catch (error) {
+      console.warn(`[PACT] getCaseByReference OData query failed for "${ref}", falling back to full cases list:`, error);
+      const cases = await this.getCases();
+      return cases.find(c => c.title === ref) || null;
+    }
   }
 
 
@@ -1219,8 +1259,10 @@ export class SharePointService {
           '__metadata': { 'type': itemType },
           [COLUMNS.CASES.TITLE]: newCase.title,
           [COLUMNS.CASES.CHARGED_PERSON]: newCase.chargedPersonName,
+          'chargedPersonName': newCase.chargedPersonName, // Flow Alias
           [COLUMNS.CASES.DEPARTMENT]: newCase.department,
           [COLUMNS.CASES.OFFENCE_CATEGORY]: newCase.offenceCategoryName,
+          'offenceName': newCase.offenceCategoryName, // Flow Alias
           [COLUMNS.CASES.PENALTY_AMOUNT]: newCase.penaltyAmount,
           [COLUMNS.CASES.DUE_DATE]: newCase.dueDate,
           [COLUMNS.CASES.ISSUER_NAME]: newCase.issuerName,
@@ -1229,15 +1271,21 @@ export class SharePointService {
           [COLUMNS.CASES.STAFF_EMAIL]: newCase.staffEmail,
           [COLUMNS.CASES.CHARGED_PERSON_EMAIL]: newCase.staffEmail,
           [COLUMNS.CASES.TIER]: policy?.tier || 'Tier 1',
+          'tier': policy?.tier || 'Tier 1', // Flow Alias
           [COLUMNS.CASES.DISCIPLINARY_ACTION]: disciplinaryAction,
-          [COLUMNS.CASES.OFFENCE_COUNT]: offCount.toString()
+          'actionLabel': disciplinaryAction, // Flow Alias
+          'disciplinaryAction': disciplinaryAction, // Flow Alias
+          [COLUMNS.CASES.OFFENCE_COUNT]: offCount.toString(),
+          'lineManagerName': person?.lineManager || '', // Flow Alias
+          'LineManager': person?.lineManager || ''
         };
 
         let finalResponse: any = null;
         try {
+          const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
           finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
             method: 'POST',
-            body: JSON.stringify(spData)
+            body: JSON.stringify(filteredData)
           });
         } catch (firstTryErr) {
           console.warn("First try failed, attempting Lookup ID format...", firstTryErr);
@@ -1254,9 +1302,10 @@ export class SharePointService {
             
             spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'] = resolvedPolicyId || parseInt(newCase.offenceCategory, 10) || null;
             
+            const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
             finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
               method: 'POST',
-              body: JSON.stringify(spData)
+              body: JSON.stringify(filteredData)
             });
           } catch (secondTryErr) {
             console.warn("Lookup ID format failed, falling back to basic fields only...", secondTryErr);
@@ -1266,9 +1315,10 @@ export class SharePointService {
             delete spData[COLUMNS.CASES.ISSUER_NAME];
             delete spData[COLUMNS.CASES.SECONDARY_CONTACT];
             
+            const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
             finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
               method: 'POST',
-              body: JSON.stringify(spData)
+              body: JSON.stringify(filteredData)
             });
           }
         }
@@ -1330,18 +1380,21 @@ export class SharePointService {
     }
     
     // Map internal status back to SP choice if needed, though here we assume titles/fields match
+    const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
     const spData = {
+      '__metadata': { 'type': itemType },
       Status: updates.status,
       // Add other field mapping as needed
     };
 
+    const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
     await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items(${id})`, {
       method: 'POST', // SharePoint uses POST with MERGE header for updates
       headers: {
         'X-HTTP-Method': 'MERGE',
         'IF-MATCH': '*'
       },
-      body: JSON.stringify(spData)
+      body: JSON.stringify(filteredData)
     });
   }
 
@@ -1387,7 +1440,7 @@ export class SharePointService {
     const tiers = ['Tier 1', 'Tier 2', 'Tier 3'];
     const casesByTier = tiers.map(tier => ({
       tier,
-      count: cases.filter(c => c.offenceCategoryName?.includes(tier)).length
+      count: cases.filter(c => c.tier === tier).length
     }));
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1402,9 +1455,9 @@ export class SharePointService {
       });
       last6Months.push({
         month: m,
-        tier1: monthlyCases.filter(c => c.offenceCategoryName?.includes('Tier 1')).length,
-        tier2: monthlyCases.filter(c => c.offenceCategoryName?.includes('Tier 2')).length,
-        tier3: monthlyCases.filter(c => c.offenceCategoryName?.includes('Tier 3')).length,
+        tier1: monthlyCases.filter(c => c.tier === 'Tier 1').length,
+        tier2: monthlyCases.filter(c => c.tier === 'Tier 2').length,
+        tier3: monthlyCases.filter(c => c.tier === 'Tier 3').length,
       });
     }
 
@@ -1440,7 +1493,7 @@ export class SharePointService {
           title: `New Case: ${c.title}`,
           description: `${c.chargedPersonName} charged with ${c.offenceCategoryName}`,
           timestamp: c.dateCreated,
-          severity: (c.offenceCategoryName?.includes('Tier 3') ? 'critical' : c.offenceCategoryName?.includes('Tier 2') ? 'high' : 'medium') as any
+          severity: (c.tier === 'Tier 3' ? 'critical' : c.tier === 'Tier 2' ? 'high' : 'medium') as any
         })),
         ...escalations.slice(0, 2).map(e => ({
           id: `e-${e.id}`,
@@ -1459,24 +1512,107 @@ export class SharePointService {
   public async getEscalationLog(): Promise<EscalationEntry[]> {
     try {
       if (!this.isLocal) {
-        const endpoint = `web/lists/getbytitle('${LIST_NAMES.ESCALATION_LOG}')/items?$orderby=ID desc`;
+        // Request FieldValuesAsText so we get text representations of ALL fields (including lookups)
+        const endpoint = `web/lists/getbytitle('${LIST_NAMES.ESCALATION_LOG}')/items?$select=*,FieldValuesAsText/*&$expand=FieldValuesAsText&$orderby=ID desc`;
         const data = await this.fetchREST(endpoint);
-        return (data.results || []).map((item: any) => ({
-          id: item.ID.toString(),
-          title: this.readField(item, COLUMNS.ESCALATION.TITLE, 'Title', 'Escalation ID'),
-          caseReference: this.readField(item, COLUMNS.ESCALATION.CASE_REFERENCE, 'Case Reference', 'CaseReference', 'Case_x0020_Reference'),
-          offender: this.readField(item, COLUMNS.ESCALATION.OFFENDER, 'Offender', 'OffenderId')?.toString?.() || String(this.readField(item, COLUMNS.ESCALATION.OFFENDER, 'Offender', 'OffenderId') || ''),
-          offenderName: this.readField(item, COLUMNS.ESCALATION.OFFENDER, 'Offender', 'OffenderId'),
-          escalationReason: this.readField(item, COLUMNS.ESCALATION.REASON, 'Escalation Reason', 'EscalationReason', 'Escalation_x0020_Reason'),
-          previousTier: this.readField(item, COLUMNS.ESCALATION.PREVIOUS_TIER, 'Previous Tier', 'PreviousTier', 'Previous_x0020_Tier'),
-          newTier: this.readField(item, COLUMNS.ESCALATION.NEW_TIER, 'New Tier', 'NewTier', 'New_x0020_Tier'),
-          triggeredBy: this.readField(item, COLUMNS.ESCALATION.TRIGGERED_BY, 'Triggered By', 'TriggeredBy', 'Triggered_x0020_By'),
-          escalationDate: this.readField(item, COLUMNS.ESCALATION.DATE, 'Escalation Date', 'EscalationDate', 'Escalation_x0020_Date'),
-          notifiedTo: this.readField(item, COLUMNS.ESCALATION.NOTIFIED_TO, 'Notified To', 'NotifiedTo', 'Notified_x0020_To')
-        }));
+        const staff = await this.getStaffDirectory();
+        const items = data.results || [];
+
+        // ── One-time diagnostic dump ───────────────────────────────────────
+        if (items.length > 0 && !this._escalationDiagLogged) {
+          this._escalationDiagLogged = true;
+          const sample = items[0];
+          const keys = Object.keys(sample).filter(k => !k.startsWith('__') && k !== 'FieldValuesAsText');
+          console.log('[PACT Escalation Diag] Raw item keys:', keys.join(', '));
+          // Log every key:value (excluding metadata/deferred)
+          const vals: Record<string, any> = {};
+          for (const k of keys) {
+            const v = sample[k];
+            if (v && typeof v === 'object' && ('__deferred' in v || '__metadata' in v)) continue;
+            vals[k] = v;
+          }
+          console.log('[PACT Escalation Diag] Raw item values:', JSON.stringify(vals, null, 2));
+          if (sample.FieldValuesAsText) {
+            const fvat = { ...sample.FieldValuesAsText };
+            delete fvat.__metadata;
+            console.log('[PACT Escalation Diag] FieldValuesAsText:', JSON.stringify(fvat, null, 2));
+          }
+        }
+
+        // ── Universal field reader (checks item directly + FieldValuesAsText) ──
+        const readEsc = (item: any, ...names: string[]): string => {
+          const fvat = item.FieldValuesAsText || {};
+          for (const name of names) {
+            // Try direct field
+            const direct = this.normalizeFieldValue(item?.[name]);
+            if (direct !== undefined && direct !== null && direct !== '') return String(direct);
+            // Try FieldValuesAsText
+            const text = fvat[name];
+            if (text !== undefined && text !== null && text !== '') return String(text);
+          }
+          return '';
+        };
+
+        return items.map((item: any) => {
+          // Offender: try lookup Id, then text fallbacks
+          const offenderId = String(
+            item.OffenderId ||
+            item.Offender_x0020_Id ||
+            readEsc(item, 'OffenderId', 'Offender_x0020_Id') ||
+            ''
+          );
+          const person = staff.find(s => s.id === offenderId);
+
+          // Offender name: resolved from staff, or from FieldValuesAsText, or raw field
+          let offenderName = person?.fullName || '';
+          if (!offenderName) {
+            offenderName = readEsc(item, 'Offender', 'OffenderName', 'Offender_x0020_Name');
+          }
+          // If name is still empty but we have an offenderId, try name match
+          if (!offenderName && offenderId) {
+            const byId = staff.find(s => s.id === offenderId);
+            if (byId) offenderName = byId.fullName;
+          }
+
+          return {
+            id: String(item.ID || item.Id || ''),
+            title: readEsc(item, 'Title') || '',
+            caseReference: readEsc(item,
+              COLUMNS.ESCALATION.CASE_REFERENCE, 'CaseReference', 'Case_x0020_Reference',
+              'Case Reference', 'CaseRef', 'Case Ref'
+            ) || '',
+            offender: offenderId,
+            offenderName,
+            escalationReason: readEsc(item,
+              COLUMNS.ESCALATION.REASON, 'EscalationReason', 'Escalation_x0020_Reason',
+              'Escalation Reason', 'Reason', 'EscalationReason0'
+            ) || '',
+            previousTier: readEsc(item,
+              COLUMNS.ESCALATION.PREVIOUS_TIER, 'PreviousTier', 'Previous_x0020_Tier',
+              'Previous Tier', 'PrevTier'
+            ) || 'Tier 1',
+            newTier: readEsc(item,
+              COLUMNS.ESCALATION.NEW_TIER, 'NewTier', 'New_x0020_Tier',
+              'New Tier', 'EscalatedTier'
+            ) || 'Tier 2',
+            triggeredBy: readEsc(item,
+              COLUMNS.ESCALATION.TRIGGERED_BY, 'TriggeredBy', 'Triggered_x0020_By',
+              'Triggered By', 'TriggerType'
+            ) || 'System',
+            escalationDate: readEsc(item,
+              COLUMNS.ESCALATION.DATE, 'EscalationDate', 'Escalation_x0020_Date',
+              'Escalation Date', 'Created'
+            ) || new Date().toISOString(),
+            notifiedTo: readEsc(item,
+              COLUMNS.ESCALATION.NOTIFIED_TO, 'NotifiedTo', 'Notified_x0020_To',
+              'Notified To', 'NotifiedTo0'
+            ) || ''
+          };
+        });
       }
       return this.getFromLocal<EscalationEntry>('pact_escalations');
-    } catch {
+    } catch (err) {
+      console.warn('[PACT] getEscalationLog failed, falling back to local:', err);
       return this.getFromLocal<EscalationEntry>('pact_escalations');
     }
   }
@@ -1487,16 +1623,23 @@ export class SharePointService {
       const staff = this.isLocal ? this.getFromLocal<StaffMember>('pact_staff') : await this.getStaffDirectory();
       const targetStaff = staff.find(s => s.id === staffId || s.fullName === staffId || (s.fullName && staffId && s.fullName.toLowerCase() === staffId.toLowerCase()));
 
+      console.log("[PACT Debug] getRepeatTrackerRecord called with staffId:", staffId);
+      console.log("[PACT Debug] Resolved targetStaff:", targetStaff);
+
       const records = this.isLocal
         ? this.getFromLocal<RepeatOffenceRecord>('pact_trackers')
         : await this.getRepeatTrackerRecords();
 
+      console.log("[PACT Debug] Total Repeat Tracker records loaded:", records.length);
+
       const existing = records.find(r => {
-        if (r.offender === staffId) return true;
-        if (targetStaff) {
-          if (r.offender === targetStaff.id) return true;
-          if (r.offenderName && r.offenderName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim()) return true;
-          if (r.offender && r.offender.toLowerCase().trim() === targetStaff.email.toLowerCase().trim()) return true;
+        const matchId = r.offender === staffId;
+        const matchStaffId = targetStaff && r.offender === targetStaff.id;
+        const matchName = targetStaff && r.offenderName && r.offenderName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim();
+        const matchEmail = targetStaff && r.offender && r.offender.toLowerCase().trim() === targetStaff.email.toLowerCase().trim();
+        if (matchId || matchStaffId || matchName || matchEmail) {
+          console.log("[PACT Debug] Match found in tracker records! Record:", r);
+          return true;
         }
         return false;
       });
@@ -1505,21 +1648,32 @@ export class SharePointService {
         return existing;
       }
 
+      console.log("[PACT Debug] No existing tracker record found. Rebuilding from cases...");
+
       // Self-Healing Sync: Rebuild tracker from Compliance Cases if empty
       if (!this.isLocal) {
         const cases = await this.getCases();
+        console.log("[PACT Debug] Total Compliance Cases loaded:", cases.length);
+        if (cases.length > 0) {
+          console.log("[PACT Debug] Sample case offender info:", {
+            chargedPerson: cases[0].chargedPerson,
+            chargedPersonName: cases[0].chargedPersonName,
+            staffEmail: cases[0].staffEmail
+          });
+        }
+
         const staffCases = cases.filter(c => {
           if (c.chargedPerson === staffId) return true;
           if (targetStaff && c.chargedPersonName && c.chargedPersonName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim()) return true;
           return false;
         });
 
+        console.log("[PACT Debug] Matching cases found for staff:", staffCases.length);
+
         if (staffCases.length > 0) {
-          console.log(`[PACT] No tracker found for ${targetStaff?.fullName || staffId}, but found ${staffCases.length} cases. Rebuilding...`);
-          
-          const tier1Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 1'));
-          const tier2Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 2'));
-          const tier3Cases = staffCases.filter(c => c.offenceCategoryName?.includes('Tier 3'));
+          const tier1Cases = staffCases.filter(c => c.tier === 'Tier 1');
+          const tier2Cases = staffCases.filter(c => c.tier === 'Tier 2');
+          const tier3Cases = staffCases.filter(c => c.tier === 'Tier 3');
 
           const sixMonthsAgo = new Date();
           sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -1543,6 +1697,8 @@ export class SharePointService {
             })
           };
 
+          console.log("[PACT Debug] Rebuilt tracker object to write:", rebuiltTracker);
+
           this.updateRepeatTracker(staffId, rebuiltTracker).catch(err => 
             console.warn("[PACT] Failed to write back rebuilt tracker", err)
           );
@@ -1564,7 +1720,8 @@ export class SharePointService {
       }
 
       return null;
-    } catch {
+    } catch (e) {
+      console.error("[PACT Debug] Error in getRepeatTrackerRecord:", e);
       return null;
     }
   }
@@ -1714,22 +1871,61 @@ export class SharePointService {
       });
       this.saveToLocal('pact_escalations', log);
     } else {
-      const spData = {
+      // Write under every possible alias so filterPayloadToAvailableFields always finds a match
+      // regardless of what the SharePoint list column internal names actually are.
+      const offenderText = entry.offenderName || entry.offender || '';
+      const reasonText = entry.escalationReason || '';
+      const caseRefText = entry.caseReference || '';
+      const prevTierText = entry.previousTier || 'Tier 1';
+      const newTierText = entry.newTier || 'Tier 2';
+      const triggeredByText = entry.triggeredBy || 'System';
+      const dateText = entry.escalationDate || new Date().toISOString();
+
+      const spData: any = {
         '__metadata': { 'type': `SP.Data.${LIST_NAMES.ESCALATION_LOG.replace(/ /g, '_x0020_')}ListItem` },
-        [COLUMNS.ESCALATION.TITLE]: entry.title || `Escalation ${entry.caseReference}`,
-        [COLUMNS.ESCALATION.CASE_REFERENCE]: entry.caseReference,
-        [COLUMNS.ESCALATION.OFFENDER]: entry.offender,
-        [COLUMNS.ESCALATION.REASON]: entry.escalationReason,
-        [COLUMNS.ESCALATION.PREVIOUS_TIER]: entry.previousTier,
-        [COLUMNS.ESCALATION.NEW_TIER]: entry.newTier,
-        [COLUMNS.ESCALATION.TRIGGERED_BY]: entry.triggeredBy || 'System',
-        [COLUMNS.ESCALATION.DATE]: entry.escalationDate || new Date().toISOString(),
-        [COLUMNS.ESCALATION.NOTIFIED_TO]: entry.notifiedTo || 'HR Dept'
+        // Title
+        'Title': entry.title || `Escalation ${caseRefText}`,
+        // Case Reference — all known aliases
+        'CaseReference': caseRefText,
+        'Case_x0020_Reference': caseRefText,
+        // Offender name — all known aliases (plain text, no lookup)
+        'Offender': offenderText,
+        'OffenderName': offenderText,
+        'Offender_x0020_Name': offenderText,
+        // Escalation Reason — all known aliases
+        'EscalationReason': reasonText,
+        'Escalation_x0020_Reason': reasonText,
+        'Reason': reasonText,
+        // Previous Tier — all known aliases
+        'PreviousTier': prevTierText,
+        'Previous_x0020_Tier': prevTierText,
+        'PrevTier': prevTierText,
+        // New Tier — all known aliases
+        'NewTier': newTierText,
+        'New_x0020_Tier': newTierText,
+        'EscalatedTier': newTierText,
+        // Triggered By
+        'TriggeredBy': triggeredByText,
+        'Triggered_x0020_By': triggeredByText,
+        'TriggerType': triggeredByText,
+        // Date
+        'EscalationDate': dateText,
+        'Escalation_x0020_Date': dateText,
+        // Notified To
+        'NotifiedTo': entry.notifiedTo || 'HR Dept',
+        'Notified_x0020_To': entry.notifiedTo || 'HR Dept',
       };
 
+      console.log('[PACT createEscalation] Writing to SharePoint:', {
+        offender: offenderText, caseRef: caseRefText,
+        reason: reasonText.substring(0, 80), prevTier: prevTierText, newTier: newTierText
+      });
+
+      const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.ESCALATION_LOG, spData);
+      console.log('[PACT createEscalation] Filtered fields sent:', Object.keys(filteredData).filter(k => k !== '__metadata').join(', '));
       await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.ESCALATION_LOG}')/items`, {
         method: 'POST',
-        body: JSON.stringify(spData)
+        body: JSON.stringify(filteredData)
       });
     }
 
@@ -1813,9 +2009,10 @@ export class SharePointService {
       [COLUMNS.DISCIPLINARY.STATUS]: action.status || 'Pending'
     };
 
+    const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.DISCIPLINARY_ACTIONS, spData);
     await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.DISCIPLINARY_ACTIONS}')/items`, {
       method: 'POST',
-      body: JSON.stringify(spData)
+      body: JSON.stringify(filteredData)
     });
   }
 
@@ -1904,9 +2101,10 @@ export class SharePointService {
         [COLUMNS.APPEALS.DECISION]: 'Pending'
       };
 
+      const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.APPEALS_REGISTER, spData);
       await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
         method: 'POST',
-        body: JSON.stringify(spData)
+        body: JSON.stringify(filteredData)
       });
     }
 
@@ -1976,17 +2174,20 @@ export class SharePointService {
         appealDetails = log[idx];
       }
     } else {
+      const itemType = await this.getListItemEntityType(LIST_NAMES.APPEALS_REGISTER);
       const spData = {
+        '__metadata': { 'type': itemType },
         [COLUMNS.APPEALS.DECISION]: updates.decision,
         [COLUMNS.APPEALS.DECISION_DATE]: new Date().toISOString(),
         [COLUMNS.APPEALS.DECISION_NOTES]: updates.decisionNotes,
         [COLUMNS.APPEALS.REVIEWING_OFFICER]: updates.reviewingOfficer
       };
 
+      const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.APPEALS_REGISTER, spData);
       await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items(${id})`, {
         method: 'POST',
         headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-        body: JSON.stringify(spData)
+        body: JSON.stringify(filteredData)
       });
 
       // Fetch the updated appeal to get appellant details for the email
@@ -2057,7 +2258,49 @@ export class SharePointService {
     staff: StaffMember[] = [],
     policies: PolicyOffence[] = []
   ): ComplianceCase {
-    const chargedPersonId = String(this.readField(item, COLUMNS.CASES.CHARGED_PERSON + 'Id', COLUMNS.CASES.CHARGED_PERSON, 'ChargedPersonId', 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '');
+    // 1. Try to get the Charged Person ID
+    let chargedPersonId = String(this.readField(item, COLUMNS.CASES.CHARGED_PERSON + 'Id', 'ChargedPersonId', 'Charged_x0020_PersonId', 'Charged_x0020_PersaonId') || '');
+
+    // 2. If no lookup ID, try the raw text field value
+    if (!chargedPersonId) {
+      const rawCharged = this.readField(item, COLUMNS.CASES.CHARGED_PERSON, 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ', 'Charged_x0020_Person', 'Charged_x0020_Persaon');
+      if (rawCharged && typeof rawCharged !== 'object') {
+        chargedPersonId = String(rawCharged);
+      } else if (rawCharged && typeof rawCharged === 'object') {
+        chargedPersonId = String(rawCharged.Id || rawCharged.ID || rawCharged.Title || '');
+      }
+    }
+
+    // 3. Try FieldValuesAsText for the display name
+    const chargedPersonDisplayText = item.FieldValuesAsText
+      ? String(item.FieldValuesAsText[COLUMNS.CASES.CHARGED_PERSON] || item.FieldValuesAsText['ChargedPerson'] || item.FieldValuesAsText['Charged Persaon'] || item.FieldValuesAsText['Charged Person'] || item.FieldValuesAsText['Charged_x0020_Person'] || item.FieldValuesAsText['Charged_x0020_Persaon'] || '')
+      : '';
+
+    // 4. Resolve the person from the staff directory
+    let chargedPerson = staff.find(s => s.id === chargedPersonId);
+    if (!chargedPerson && chargedPersonId) {
+      chargedPerson = staff.find(s => s.fullName && chargedPersonId && s.fullName.toLowerCase() === chargedPersonId.toLowerCase());
+    }
+    if (!chargedPerson && chargedPersonDisplayText) {
+      chargedPerson = staff.find(s => s.fullName && s.fullName.toLowerCase().trim() === chargedPersonDisplayText.toLowerCase().trim());
+      // If we found by display name, use the staff member's canonical ID
+      if (chargedPerson) {
+        chargedPersonId = chargedPerson.id;
+      }
+    }
+
+    // Debug logging for first item to help diagnose field mapping
+    if (!this._caseMappingLogged) {
+      this._caseMappingLogged = true;
+      console.log('[PACT Debug] mapSPItemToCase sample item keys:', Object.keys(item).filter(k => !k.startsWith('__')).join(', '));
+      console.log('[PACT Debug] ChargedPerson resolution:', {
+        chargedPersonId,
+        chargedPersonDisplayText,
+        resolvedStaff: chargedPerson?.fullName || 'NOT FOUND',
+        rawFieldValue: item[COLUMNS.CASES.CHARGED_PERSON],
+        rawFieldIdValue: item[COLUMNS.CASES.CHARGED_PERSON + 'Id']
+      });
+    }
     
     let offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY + 'Id', 'OffenceCategoryId', 'OffenceCategoryVal') || '');
     if (!offenceCategoryId) {
@@ -2069,7 +2312,6 @@ export class SharePointService {
     if (!offenceCategoryId) {
       offenceCategoryId = String(this.readField(item, COLUMNS.CASES.OFFENCE_CATEGORY, 'OffenceCategory', 'Offence Category', 'Offence_x0020_Category') || '');
     }
-    const chargedPerson = staff.find(s => s.id === chargedPersonId || s.fullName === chargedPersonId || (s.fullName && chargedPersonId && s.fullName.toLowerCase() === chargedPersonId.toLowerCase()));
 
     let rawOffence = item.FieldValuesAsText ? (item.FieldValuesAsText[COLUMNS.CASES.OFFENCE_CATEGORY] || item.FieldValuesAsText['OffenceCategory'] || item.FieldValuesAsText['Offence_x0020_Category'] || item.FieldValuesAsText['Offence']) : '';
     if (!rawOffence) {
@@ -2085,12 +2327,12 @@ export class SharePointService {
     );
 
     return {
-      id: item.ID.toString(),
+      id: String(item.ID || item.Id || ''),
       title: this.readField(item, COLUMNS.CASES.TITLE, 'Penalty ID', 'Case ID', 'CaseID', 'Title'),
       chargedPerson: chargedPersonId,
-      chargedPersonName: chargedPerson?.fullName || this.readField(item, COLUMNS.CASES.CHARGED_PERSON, 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '',
-      staffEmail: this.readField(item, COLUMNS.CASES.STAFF_EMAIL, 'StaffEmail', 'Email', 'Charged Person Email', 'Staff Email'),
-      department: this.readField(item, COLUMNS.CASES.DEPARTMENT, 'Department'),
+      chargedPersonName: chargedPerson?.fullName || chargedPersonDisplayText || this.readField(item, COLUMNS.CASES.CHARGED_PERSON, 'ChargedPerson', 'Charged Persaon', 'Charged Person', 'Charged Person ') || '',
+      staffEmail: chargedPerson?.email || this.readField(item, COLUMNS.CASES.STAFF_EMAIL, 'StaffEmail', 'Email', 'Charged Person Email', 'Staff Email', 'ChargedPersonEmail') || '',
+      department: chargedPerson?.department || this.readField(item, COLUMNS.CASES.DEPARTMENT, 'Department') || '',
       offenceCategory: offenceCategoryId,
       offenceCategoryName: policy ? this.expandAbbreviations(policy.offenceName) : offenceStr,
       offenceDescription: this.readField(item, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description') || '',
@@ -2099,7 +2341,8 @@ export class SharePointService {
       issuerName: this.readField(item, COLUMNS.CASES.ISSUER_NAME, 'IssuerName', 'Issuer Name', 'Issuer_x0020_Name'),
       secondaryContact: this.readField(item, COLUMNS.CASES.SECONDARY_CONTACT, 'SecondaryContact', 'Secondary Contact Email'),
       status: this.readField(item, COLUMNS.CASES.STATUS, 'Status'),
-      dateCreated: this.readField(item, 'Created', 'Date Created', 'Date Created ') || new Date().toISOString()
+      dateCreated: this.readField(item, 'Created', 'Date Created', 'Date Created ') || new Date().toISOString(),
+      tier: this.readField(item, COLUMNS.CASES.TIER, 'Tier') || policy?.tier || 'Tier 1'
     };
   }
 

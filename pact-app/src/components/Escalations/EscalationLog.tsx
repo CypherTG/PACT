@@ -46,35 +46,42 @@ export const EscalationLog: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {logs.map(log => (
+              {logs.map(log => {
+                const prevTier = String(log.previousTier || 'Tier 1');
+                const nextTier = String(log.newTier || 'Tier 2');
+                const trigger = String(log.triggeredBy || 'System');
+                const escDate = log.escalationDate ? new Date(log.escalationDate) : null;
+                const dateStr = escDate && !isNaN(escDate.getTime()) ? escDate.toLocaleDateString() : '—';
+                return (
                 <tr key={log.id}>
-                  <td>{new Date(log.escalationDate).toLocaleDateString()}</td>
+                  <td>{dateStr}</td>
                   <td style={{fontWeight: 600}}>
-                    {log.offenderName || `Staff ID: ${log.offender}`}
+                    {log.offenderName || `Staff ID: ${log.offender || '—'}`}
                   </td>
-                  <td className="link-action" style={{cursor:'pointer'}}>{log.caseReference}</td>
+                  <td className="link-action" style={{cursor:'pointer'}}>{log.caseReference || '—'}</td>
                   <td>
-                    <span className={`status-badge status-${log.previousTier.toLowerCase().replace(' ', '')}`}>
-                      {log.previousTier}
+                    <span className={`status-badge status-${prevTier.toLowerCase().replace(' ', '')}`}>
+                      {prevTier}
                     </span>
                   </td>
                   <td>
-                    <span className="text-secondary">{log.previousTier}</span> 
+                    <span className="text-secondary">{prevTier}</span> 
                     <span style={{margin: '0 8px', color: 'var(--primary)'}}>→</span> 
-                    <span className={`status-badge status-${log.newTier.toLowerCase().replace(' ', '')}`}>
-                      {log.newTier}
+                    <span className={`status-badge status-${nextTier.toLowerCase().replace(' ', '')}`}>
+                      {nextTier}
                     </span>
                   </td>
                   <td>
-                    <span className={`status-badge ${log.triggeredBy === 'System' ? 'status-paid' : 'status-unpaid'}`}>
-                      {log.triggeredBy}
+                    <span className={`status-badge ${trigger === 'System' ? 'status-paid' : 'status-unpaid'}`}>
+                      {trigger}
                     </span>
                   </td>
-                  <td className="text-secondary" style={{maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={log.escalationReason}>
-                    {log.escalationReason}
+                  <td className="text-secondary" style={{maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={String(log.escalationReason || '')}>
+                    {log.escalationReason || '—'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {logs.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center">No escalations recorded yet.</td>

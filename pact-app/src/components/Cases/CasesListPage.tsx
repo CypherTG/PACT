@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { ComplianceCase } from '../../config/types';
 import './Cases.css';
