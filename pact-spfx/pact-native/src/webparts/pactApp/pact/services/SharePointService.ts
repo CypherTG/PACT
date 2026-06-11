@@ -864,7 +864,7 @@ export class SharePointService {
         })).sort((a,b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
       }
 
-      const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,OffenceCategory/Id,OffenceCategory/Title,FieldValuesAsText/*&$expand=OffenceCategory,FieldValuesAsText&$orderby=Created desc`;
+      const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,FieldValuesAsText/*&$expand=FieldValuesAsText&$orderby=Created desc`;
       const data = await this.fetchREST(endpoint);
       const [staff, policies] = await Promise.all([
         this.getStaffDirectory(),
