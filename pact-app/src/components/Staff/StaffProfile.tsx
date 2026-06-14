@@ -127,24 +127,31 @@ export const StaffProfile: React.FC = () => {
             <h3 style={{fontSize: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
               <TrendingUp size={18} color="var(--primary)"/> Offence Matrix
             </h3>
-            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
-                <span className="text-secondary">Tier 1 (6m)</span>
-                <span style={{fontWeight: 600}}>{tracker?.tier1Last6Months || 0}</span>
-              </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
-                <span className="text-secondary">Tier 2 Total</span>
-                <span style={{fontWeight: 600}}>{tracker?.tier2Offences || 0}</span>
-              </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
-                <span className="text-secondary">Tier 3 Total</span>
-                <span style={{fontWeight: 600}}>{tracker?.tier3Offences || 0}</span>
-              </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
-                <span className="text-secondary">Total Breaches</span>
-                <span style={{fontWeight: 600}}>{tracker?.totalOffences || 0}</span>
-              </div>
-            </div>
+            {(() => {
+              const t1 = tracker ? (tracker.tier1Last6Months || 0) : 0;
+              const t2 = tracker ? ((tracker.tier2Offences || 0) + Math.floor(t1 / 3)) : 0;
+              const t3 = tracker ? ((tracker.tier3Offences || 0) + Math.floor(t2 / 2)) : 0;
+              return (
+                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 1 offences in last 6 months">
+                    <span className="text-secondary">Tier 1 (6m)</span>
+                    <span style={{fontWeight: 600}}>{t1}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 2 offences (including escalations)">
+                    <span className="text-secondary">Tier 2 Total</span>
+                    <span style={{fontWeight: 600}}>{t2}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 3 offences (including escalations)">
+                    <span className="text-secondary">Tier 3 Total</span>
+                    <span style={{fontWeight: 600}}>{t3}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
+                    <span className="text-secondary">Total Breaches</span>
+                    <span style={{fontWeight: 600}}>{tracker?.totalOffences || 0}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

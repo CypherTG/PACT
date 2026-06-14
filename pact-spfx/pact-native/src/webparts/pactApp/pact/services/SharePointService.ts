@@ -1515,12 +1515,16 @@ export class SharePointService {
         // Request FieldValuesAsText so we get text representations of ALL fields (including lookups)
         const endpoint = `web/lists/getbytitle('${LIST_NAMES.ESCALATION_LOG}')/items?$select=*,FieldValuesAsText/*&$expand=FieldValuesAsText&$orderby=ID desc`;
         const data = await this.fetchREST(endpoint);
-        const staff = await this.getStaffDirectory();
+        const [staff, cases] = await Promise.all([
+          this.getStaffDirectory(),
+          this.getCases()
+        ]);
         const items = data.results || [];
 
         // ── One-time diagnostic dump ───────────────────────────────────────
         if (items.length > 0 && !this._escalationDiagLogged) {
           this._escalationDiagLogged = true;
+          this.diagnoseListColumns(LIST_NAMES.ESCALATION_LOG);
           const sample = items[0];
           const keys = Object.keys(sample).filter(k => !k.startsWith('__') && k !== 'FieldValuesAsText');
           console.log('[PACT Escalation Diag] Raw item keys:', keys.join(', '));
@@ -1554,17 +1558,29 @@ export class SharePointService {
         };
 
         return items.map((item: any) => {
-          // Offender: try lookup Id, then text fallbacks
-          const offenderId = String(
+          const caseRef = readEsc(item,
+            COLUMNS.ESCALATION.CASE_REFERENCE, 'CaseReference', 'Case_x0020_Reference',
+            'Case Reference', 'CaseRef', 'Case Ref'
+          ) || '';
+          
+          // Find matching compliance case
+          const matchingCase = cases.find(c => c.title === caseRef);
+
+          // Offender: try lookup Id, then matchingCase, then text fallbacks
+          let offenderId = String(
             item.OffenderId ||
             item.Offender_x0020_Id ||
             readEsc(item, 'OffenderId', 'Offender_x0020_Id') ||
             ''
           );
+          if (!offenderId && matchingCase) {
+            offenderId = matchingCase.chargedPerson;
+          }
+
           const person = staff.find(s => s.id === offenderId);
 
-          // Offender name: resolved from staff, or from FieldValuesAsText, or raw field
-          let offenderName = person?.fullName || '';
+          // Offender name: resolved from staff, matchingCase, FieldValuesAsText, or raw field
+          let offenderName = person?.fullName || matchingCase?.chargedPersonName || '';
           if (!offenderName) {
             offenderName = readEsc(item, 'Offender', 'OffenderName', 'Offender_x0020_Name');
           }
@@ -1574,27 +1590,36 @@ export class SharePointService {
             if (byId) offenderName = byId.fullName;
           }
 
+          const prevTier = readEsc(item,
+            COLUMNS.ESCALATION.PREVIOUS_TIER, 'PreviousTier', 'Previous_x0020_Tier',
+            'Previous Tier', 'PrevTier'
+          ) || 'Tier 1';
+          const nextTier = readEsc(item,
+            COLUMNS.ESCALATION.NEW_TIER, 'NewTier', 'New_x0020_Tier',
+            'New Tier', 'EscalatedTier'
+          ) || 'Tier 2';
+
+          let escalationReason = readEsc(item,
+            COLUMNS.ESCALATION.REASON, 'EscalationReason', 'Escalation_x0020_Reason',
+            'Escalation Reason', 'Reason', 'EscalationReason0'
+          );
+          if (!escalationReason) {
+            if (matchingCase) {
+              escalationReason = `Escalation from ${prevTier} to ${nextTier} triggered by compliance case ${caseRef} (${matchingCase.offenceCategoryName}).`;
+            } else {
+              escalationReason = `Automatic policy trigger escalating staff member from ${prevTier} to ${nextTier}.`;
+            }
+          }
+
           return {
             id: String(item.ID || item.Id || ''),
             title: readEsc(item, 'Title') || '',
-            caseReference: readEsc(item,
-              COLUMNS.ESCALATION.CASE_REFERENCE, 'CaseReference', 'Case_x0020_Reference',
-              'Case Reference', 'CaseRef', 'Case Ref'
-            ) || '',
+            caseReference: caseRef,
             offender: offenderId,
             offenderName,
-            escalationReason: readEsc(item,
-              COLUMNS.ESCALATION.REASON, 'EscalationReason', 'Escalation_x0020_Reason',
-              'Escalation Reason', 'Reason', 'EscalationReason0'
-            ) || '',
-            previousTier: readEsc(item,
-              COLUMNS.ESCALATION.PREVIOUS_TIER, 'PreviousTier', 'Previous_x0020_Tier',
-              'Previous Tier', 'PrevTier'
-            ) || 'Tier 1',
-            newTier: readEsc(item,
-              COLUMNS.ESCALATION.NEW_TIER, 'NewTier', 'New_x0020_Tier',
-              'New Tier', 'EscalatedTier'
-            ) || 'Tier 2',
+            escalationReason,
+            previousTier: prevTier as any,
+            newTier: nextTier as any,
             triggeredBy: readEsc(item,
               COLUMNS.ESCALATION.TRIGGERED_BY, 'TriggeredBy', 'Triggered_x0020_By',
               'Triggered By', 'TriggerType'

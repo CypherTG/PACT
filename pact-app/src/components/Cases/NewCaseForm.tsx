@@ -59,10 +59,14 @@ export const NewCaseForm: React.FC = () => {
   
   // Calculate dynamic action based on history
   const offenceCount = useMemo(() => {
-    if (!selectedPolicy) return 1;
-    if (selectedPolicy.tier === 'Tier 1') return (staffHistory?.tier1Last6Months || 0) + 1;
-    if (selectedPolicy.tier === 'Tier 2') return (staffHistory?.tier2Offences || 0) + 1;
-    if (selectedPolicy.tier === 'Tier 3') return (staffHistory?.tier3Offences || 0) + 1;
+    if (!selectedPolicy || !staffHistory) return 1;
+    const t1 = staffHistory.tier1Last6Months || 0;
+    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
+    
+    if (selectedPolicy.tier === 'Tier 1') return t1 + 1;
+    if (selectedPolicy.tier === 'Tier 2') return t2 + 1;
+    if (selectedPolicy.tier === 'Tier 3') return t3 + 1;
     return 1;
   }, [selectedPolicy, staffHistory]);
   
@@ -77,11 +81,20 @@ export const NewCaseForm: React.FC = () => {
   }, [selectedPolicy, offenceCount, isEscalated]);
 
   const actionLabel = useMemo(() => {
-    if (isEscalated) return "Escalated Action";
     if (offenceCount === 1) return "1st Offence Path";
     if (offenceCount === 2) return "2nd Offence Path";
-    return "3rd Offence Path";
-  }, [isEscalated, offenceCount]);
+    if (offenceCount === 3) return "3rd Offence Path";
+    return `${offenceCount}th Offence Path`;
+  }, [offenceCount]);
+
+  const cascadingHistory = useMemo(() => {
+    if (!staffHistory) return null;
+    const t1 = staffHistory.tier1Last6Months || 0;
+    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
+    return { t1, t2, t3 };
+  }, [staffHistory]);
+
   const riskColor = useMemo(() => {
     if (!staffHistory) return 'var(--text-secondary)';
     const level = escalationEngine.calculateRiskLevel(staffHistory);
@@ -224,8 +237,9 @@ export const NewCaseForm: React.FC = () => {
                 
                 <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', opacity: 0.8 }}>
-                    <span title="Tier 1 offences in last 6 months">T1: <b>{staffHistory?.tier1Last6Months || 0}</b></span>
-                    <span title="Total Tier 2 offences">T2: <b>{staffHistory?.tier2Offences || 0}</b></span>
+                    <span title="Tier 1 offences in last 6 months">T1: <b>{cascadingHistory?.t1 || 0}</b></span>
+                    <span title="Tier 2 offences (including escalations)">T2: <b>{cascadingHistory?.t2 || 0}</b></span>
+                    <span title="Tier 3 offences (including escalations)">T3: <b>{cascadingHistory?.t3 || 0}</b></span>
                     <span>Status: <b>{actionLabel}</b></span>
                   </div>
                   {isEscalated && (

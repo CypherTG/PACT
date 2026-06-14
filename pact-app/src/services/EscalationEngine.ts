@@ -51,9 +51,13 @@ export class EscalationEngine {
    * Calculates the overall risk level for an employee based on updated counts.
    */
   public calculateRiskLevel(tracker: RepeatOffenceRecord): 'Low' | 'Medium' | 'High' | 'Critical' {
-    if (tracker.tier3Offences > 0) return 'Critical';
-    if (tracker.tier2Offences > 1) return 'High';
-    if (tracker.tier2Offences === 1 || tracker.tier1Last6Months >= 2) return 'Medium';
+    const t1 = tracker.tier1Last6Months || 0;
+    const t2 = (tracker.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t3 = (tracker.tier3Offences || 0) + Math.floor(t2 / 2);
+
+    if (t3 > 0) return 'Critical';
+    if (t2 > 1) return 'High';
+    if (t2 === 1 || t1 >= 2) return 'Medium';
     return 'Low';
   }
 
