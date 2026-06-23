@@ -163,6 +163,8 @@ export default class PactAppWebPart extends BaseClientSideWebPart<IPactAppWebPar
 
     if (semanticColors) {
       this.domElement.style.setProperty('--bodyText', semanticColors.bodyText || '');
+      this.domElement.style.setProperty('--bodySubtext', semanticColors.bodySubtext || '');
+      this.domElement.style.setProperty('--bodyBackground', semanticColors.bodyBackground || '');
       this.domElement.style.setProperty('--link', semanticColors.link || '');
       this.domElement.style.setProperty('--linkHovered', semanticColors.linkHovered || '');
     }

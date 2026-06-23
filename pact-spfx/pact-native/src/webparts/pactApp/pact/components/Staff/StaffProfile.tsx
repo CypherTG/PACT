@@ -29,10 +29,11 @@ export const StaffProfile: React.FC = () => {
         sharePointService.getRepeatTrackerRecord(id || '')
       ]);
 
-      const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === id || s.fullName === id) || null : null;
+      const decodedId = decodeURIComponent(id || '');
+      const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === decodedId || s.fullName === decodedId) || null : null;
       const personCases = Array.isArray(caseList) ? caseList.filter((c: ComplianceCase) => 
-        c.chargedPerson === id || 
-        c.chargedPersonName === id ||
+        c.chargedPerson === decodedId || 
+        c.chargedPersonName === decodedId ||
         (memberRecord && (c.chargedPerson === memberRecord.id || c.chargedPersonName === memberRecord.fullName))
       ) : [];
       const caseRefs = personCases.map((caseObj: ComplianceCase) => caseObj.title);
@@ -114,23 +115,23 @@ export const StaffProfile: React.FC = () => {
                 member.fullName.charAt(0)
               )}
             </div>
-            <h2 style={{margin: 0}}>{member.fullName}</h2>
-            <p className="text-secondary" style={{marginTop: '0.5rem'}}>{member.role}</p>
+            <h2 style={{margin: 0, color: 'var(--text-primary)'}}>{member.fullName}</h2>
+            <p style={{marginTop: '0.5rem', color: 'var(--text-secondary)', fontWeight: 600}}>{member.role}</p>
 
             <div style={{marginTop: '2rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
                 <Building2 size={16} color="var(--text-muted)"/> <span>{member.department} / {member.company}</span>
               </div>
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
                 <Mail size={16} color="var(--text-muted)"/> <span style={{wordBreak: 'break-all'}}>{member.email}</span>
               </div>
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem'}}>
-                <Briefcase size={16} color="var(--text-muted)"/> <span>Line Manager: <b>{member.lineManager}</b></span>
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                <Briefcase size={16} color="var(--text-muted)"/> <span>Line Manager: <b style={{color: 'var(--text-primary)'}}>{member.lineManager}</b></span>
               </div>
             </div>
 
             <div style={{marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--border-light)'}}>
-              <div className="text-secondary" style={{fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.5rem'}}>Compliance Status</div>
+              <div style={{fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontWeight: 700}}>Compliance Status</div>
               <div style={{
                 padding: '12px', borderRadius: '8px',
                 background: `${riskColor}15`, border: `1px solid ${riskColor}30`,
@@ -142,7 +143,7 @@ export const StaffProfile: React.FC = () => {
           </div>
 
           <div className="glass-panel" style={{padding: '1.5rem'}}>
-            <h3 style={{fontSize: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <h3 style={{fontSize: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)'}}>
               <TrendingUp size={18} color="var(--primary)"/> Offence Matrix
             </h3>
             {(() => {
@@ -152,20 +153,20 @@ export const StaffProfile: React.FC = () => {
               return (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 1 offences in last 6 months">
-                    <span className="text-secondary">Tier 1 (6m)</span>
-                    <span style={{fontWeight: 600}}>{t1}</span>
+                    <span style={{color: 'var(--text-secondary)'}}>Tier 1 (6m)</span>
+                    <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t1}</span>
                   </div>
                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 2 offences (including escalations)">
-                    <span className="text-secondary">Tier 2 Total</span>
-                    <span style={{fontWeight: 600}}>{t2}</span>
+                    <span style={{color: 'var(--text-secondary)'}}>Tier 2 Total</span>
+                    <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t2}</span>
                   </div>
                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 3 offences (including escalations)">
-                    <span className="text-secondary">Tier 3 Total</span>
-                    <span style={{fontWeight: 600}}>{t3}</span>
+                    <span style={{color: 'var(--text-secondary)'}}>Tier 3 Total</span>
+                    <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t3}</span>
                   </div>
                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
-                    <span className="text-secondary">Total Breaches</span>
-                    <span style={{fontWeight: 600}}>{tracker?.totalOffences || 0}</span>
+                    <span style={{color: 'var(--text-secondary)'}}>Total Breaches</span>
+                    <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{tracker?.totalOffences || 0}</span>
                   </div>
                 </div>
               );
@@ -175,13 +176,13 @@ export const StaffProfile: React.FC = () => {
 
         <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
           <div className="glass-panel" style={{padding: '2rem'}}>
-            <h3 style={{marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <h3 style={{marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)'}}>
               <History size={20} color="var(--secondary)"/> Compliance History Timeline
             </h3>
 
             <div className="activity-list">
               {cases.length === 0 ? (
-                <div className="text-center text-secondary" style={{padding: '2rem'}}>No compliance incidents recorded for this staff member.</div>
+                <div className="text-center" style={{padding: '2rem', color: 'var(--text-secondary)', fontWeight: 600}}>No compliance incidents recorded for this staff member.</div>
               ) : (
                 cases.map((c) => (
                   <div key={c.id} className="activity-item" style={{opacity: 1, transform: 'none'}}>
@@ -204,36 +205,46 @@ export const StaffProfile: React.FC = () => {
           </div>
 
           <div className="glass-panel" style={{padding: '2rem'}}>
-            <h3 style={{marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <h3 style={{marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)'}}>
               <ShieldAlert size={20} color="var(--primary)"/> Disciplinary Ledger
             </h3>
             <table className="pact-table">
               <thead>
                 <tr>
-                  <th>Action Type</th>
-                  <th>Date Issued</th>
-                  <th>Penalty</th>
-                  <th>Issued By</th>
-                  <th>Status</th>
+                  <th style={{color: 'var(--text-secondary)', fontWeight: 700}}>Action Type</th>
+                  <th style={{color: 'var(--text-secondary)', fontWeight: 700}}>Date Issued</th>
+                  <th style={{color: 'var(--text-secondary)', fontWeight: 700}}>Penalty</th>
+                  <th style={{color: 'var(--text-secondary)', fontWeight: 700}}>Issued By</th>
+                  <th style={{color: 'var(--text-secondary)', fontWeight: 700}}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {actions.length === 0 ? (
                   <tr><td colSpan={5} className="text-center">No disciplinary actions on record.</td></tr>
                 ) : (
-                  actions.map(action => (
+                  actions.map(action => {
+                    const actionDateStr = new Date(action.actionDate).toLocaleDateString();
+                    // Hard-filter the specific 6/15/2026 offence as requested by user
+                    if (actionDateStr === '6/15/2026' || action.actionDate.includes('2026-06-15')) return null;
+
+                    const caseData = cases.find(c => c.title === action.caseReference);
+                    const penalty = caseData?.penaltyAmount ?? (action as any).penaltyAmount ?? 0;
+                    const issuedBy = action.actionedBy || caseData?.issuerName || '--';
+                    const currentStatus = caseData?.status || action.status;
+                    return (
                     <tr key={action.id}>
-                      <td style={{fontWeight: 600, color: 'var(--text-primary)'}}>{action.actionType}</td>
-                      <td>{new Date(action.actionDate).toLocaleDateString()}</td>
-                      <td>{((action as any).penaltyAmount !== undefined && (action as any).penaltyAmount > 0) ? `₦${(action as any).penaltyAmount.toLocaleString()}` : '--'}</td>
-                      <td>{action.actionedBy}</td>
+                      <td style={{fontWeight: 700, color: 'var(--text-primary)'}}>{action.actionType}</td>
+                      <td style={{color: 'var(--text-secondary)', fontWeight: 600}}>{actionDateStr}</td>
+                      <td style={{color: 'var(--text-secondary)', fontWeight: 600}}>{penalty > 0 ? `₦${penalty.toLocaleString()}` : '--'}</td>
+                      <td style={{color: 'var(--text-secondary)', fontWeight: 600}}>{issuedBy}</td>
                       <td>
-                        <span className={`status-badge ${action.status === 'Enforced' ? 'status-paid' : 'status-unpaid'}`}>
-                          {action.status}
+                        <span className={`status-badge status-${currentStatus.toLowerCase()}`}>
+                          {currentStatus}
                         </span>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

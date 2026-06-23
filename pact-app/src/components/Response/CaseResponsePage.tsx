@@ -5,6 +5,7 @@ import type { ComplianceCase } from '../../config/types';
 import { PaymentDetailsPage } from './PaymentDetailsPage';
 import { AppealSubmissionPage } from './AppealSubmissionPage';
 import { AlertTriangle } from 'lucide-react';
+import { PAYMENT_DEADLINE_DAYS } from '../../config/constants';
 
 function getHashQueryParams(): URLSearchParams {
   const raw = typeof window !== 'undefined' ? window.location.hash : '';
@@ -15,7 +16,7 @@ function getHashQueryParams(): URLSearchParams {
 function buildFallbackCase(caseId: string): ComplianceCase {
   const params = getHashQueryParams();
   const dateCreated = new Date().toISOString();
-  const dueDate = params.get('due') || params.get('date') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const dueDate = params.get('due') || params.get('date') || new Date(Date.now() + PAYMENT_DEADLINE_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const amount = Number(params.get('amount') || 0);
 
   return {

@@ -131,7 +131,7 @@ export const CaseDetail: React.FC = () => {
               </div>
             </div>
             
-            <button className="btn btn-secondary" onClick={() => history.push(`/staff/${caseData.chargedPerson}`)} style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
+            <button className="btn btn-secondary" onClick={() => history.push(`/staff/${encodeURIComponent(caseData.chargedPerson || '')}`)} style={{ marginTop: '16px', width: '100%', justifyContent: 'center' }}>
               <User size={16} /> View Full Profile & History
             </button>
           </div>

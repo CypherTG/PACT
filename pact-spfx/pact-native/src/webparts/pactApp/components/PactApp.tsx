@@ -76,9 +76,17 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
     if (typeof window !== 'undefined') {
       window.addEventListener('hashchange', this.handleHashChange);
     }
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-is-dark-theme', Boolean(this.props.isDarkTheme).toString());
+    }
   }
 
   public componentDidUpdate(prevProps: IPactAppProps, prevState: PactAppState): void {
+    if (prevProps.isDarkTheme !== this.props.isDarkTheme) {
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-is-dark-theme', Boolean(this.props.isDarkTheme).toString());
+      }
+    }
     if (this.state.isOpen !== prevState.isOpen) {
       if (typeof document !== 'undefined') {
         if (this.state.isOpen) {
@@ -138,7 +146,7 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
 
     // Check if opened via the "open" hash
     const hash = this.state.currentHash || '';
-    const isFullApp = hash === '#/open' || (hash.startsWith('#/') && hash !== '#/');
+    const isFullApp = hash === '#/open' || (hash.startsWith('#/') && hash !== '#/') || (typeof window !== 'undefined' && window.location.search.includes('pact_'));
 
     // 2. Full PACT Portal view: Render as fullscreen overlay with a Close/Exit header
     if (isFullApp || this.state.isOpen) {
@@ -307,9 +315,8 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
                 <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <h2 className="pact-startup-title">PACT Portal</h2>
-              <div className="pact-startup-subtitle">Konstructum</div>
               <p className="pact-startup-desc">
-                Policy Agreement &amp; Compliance Tracking Platform. Securely manage compliance cases, disciplinary metrics, and mail logs.
+                Policy, Accountability &amp; Compliance Tracking Platform. Securely manage compliance cases, disciplinary metrics, and mail logs.
               </p>
               <button 
                 type="button" 

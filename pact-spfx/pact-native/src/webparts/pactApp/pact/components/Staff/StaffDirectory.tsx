@@ -59,15 +59,13 @@ export const StaffDirectory: React.FC = () => {
           </button>
         </div>
       </div>
-
       <div className="cases-table-container glass-panel">
         <table className="pact-table">
             <thead>
               <tr>
                 <th>Employee</th>
-                <th>Department & Role</th>
+                <th>Department/Role</th>
                 <th>Company</th>
-                <th>Type</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -96,8 +94,8 @@ export const StaffDirectory: React.FC = () => {
                           s.fullName.charAt(0)
                         )}
                       </div>
-                      <div>
-                        <NavLink to={`/staff/${s.id}`} className="link-action" style={{ fontWeight: 600, fontSize: '1rem', display: 'block' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <NavLink to={`/staff/${encodeURIComponent(s.id)}`} className="link-action" style={{ fontWeight: 600, fontSize: '1rem', display: 'block' }}>
                           {s.fullName}
                         </NavLink>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{s.email}</div>
@@ -110,18 +108,13 @@ export const StaffDirectory: React.FC = () => {
                   </td>
                   <td>{s.company}</td>
                   <td>
-                    <span className="status-badge" style={{background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)'}}>
-                      {s.employeeType}
-                    </span>
-                  </td>
-                  <td>
-                    <NavLink to={`/staff/${s.id}`} className="link-action">View Profile</NavLink>
+                    <NavLink to={`/staff/${encodeURIComponent(s.id)}`} className="link-action">View Profile</NavLink>
                   </td>
                 </tr>
               ))}
               {filteredStaff.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center">No staff members found.</td>
+                  <td colSpan={4} className="text-center">No staff members found.</td>
                 </tr>
               )}
             </tbody>

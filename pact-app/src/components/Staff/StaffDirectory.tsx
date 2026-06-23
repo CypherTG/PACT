@@ -67,11 +67,10 @@ export const StaffDirectory: React.FC = () => {
       <div className="cases-table-container glass-panel">
         <table className="pact-table">
             <thead>
-              <tr>
+               <tr>
                 <th>Employee</th>
-                <th>Department & Role</th>
+                <th>Department/Role</th>
                 <th>Company</th>
-                <th>Type</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -85,7 +84,7 @@ export const StaffDirectory: React.FC = () => {
                       </div>
                       <div>
                         <NavLink to={`/staff/${s.id}`} className="link-action" style={{ fontWeight: 600, fontSize: '1rem', display: 'block' }}>
-                          {s.fullName}
+                           {s.fullName}
                         </NavLink>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{s.email}</div>
                       </div>
@@ -97,18 +96,13 @@ export const StaffDirectory: React.FC = () => {
                   </td>
                   <td>{s.company}</td>
                   <td>
-                    <span className="status-badge" style={{background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)'}}>
-                      {s.employeeType}
-                    </span>
-                  </td>
-                  <td>
                     <NavLink to={`/staff/${s.id}`} className="link-action">View Profile</NavLink>
                   </td>
                 </tr>
               ))}
               {filteredStaff.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center">No staff members found.</td>
+                  <td colSpan={4} className="text-center">No staff members found.</td>
                 </tr>
               )}
             </tbody>

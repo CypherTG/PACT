@@ -3,6 +3,7 @@ import { NavLink, useHistory } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import { escalationEngine } from '../../services/EscalationEngine';
+import { PAYMENT_DEADLINE_DAYS } from '../../config/constants';
 import type { StaffMember, PolicyOffence, RepeatOffenceRecord } from '../../config/types';
 
 export const NewCaseForm: React.FC = () => {
@@ -29,7 +30,7 @@ export const NewCaseForm: React.FC = () => {
       sharePointService.getStaffDirectory(),
       sharePointService.getPolicyLibrary()
     ]).then(([staffData, policyData]) => {
-      setStaff(staffData);
+      setStaff(staffData.filter(s => s && s.fullName).sort((a, b) => (a.fullName || '').trim().localeCompare((b.fullName || '').trim(), undefined, { sensitivity: 'base' })));
       setPolicies(policyData);
     });
   }, []);
@@ -113,22 +114,22 @@ export const NewCaseForm: React.FC = () => {
     }
     
     setIsSubmitting(true);
-    try {
-      await sharePointService.createCase({
-        chargedPerson: personId,
-        offenceCategory: categoryId,
-        offenceDescription: description,
-        dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
-        evidence: selectedFile ? selectedFile.name : undefined
-      });
-      setIsSubmitting(false);
-      setSuccess(true);
-      setTimeout(() => history.push('/cases'), 4000);
-    } catch (error) {
-      console.error("Submission failed:", error);
-      setIsSubmitting(false);
-      alert("Failed to log incident. Please check your connection or reset the engine.");
-    }
+    
+    // Fire and forget to make the UI instantly responsive
+    sharePointService.createCase({
+      chargedPerson: personId,
+      offenceCategory: categoryId,
+      offenceDescription: description,
+      dueDate: dueDate || new Date(Date.now() + PAYMENT_DEADLINE_DAYS * 86400000).toISOString(),
+      evidence: selectedFile ? selectedFile.name : undefined
+    }).catch(error => {
+      console.error("Background submission error:", error);
+    });
+
+    // Show success immediately
+    setIsSubmitting(false);
+    setSuccess(true);
+    setTimeout(() => history.push('/cases'), 3000);
   };
 
   if (success) {
@@ -268,17 +269,7 @@ export const NewCaseForm: React.FC = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Date</label>
-            <input 
-              type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
-              required
-              data-testid="case-due-date"
-              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
-            />
-          </div>
+
 
           <div className="form-group">
             <label className="text-secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Evidence Attachment</label>

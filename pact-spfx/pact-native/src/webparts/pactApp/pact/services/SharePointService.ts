@@ -177,7 +177,7 @@ export class SharePointService {
 
     try {
       console.log(`[PACT] Initializing SharePoint Service (Mode: ${this.runtimeMode})`);
-      const DATA_VERSION = "5.0"; // Fixed key namespace
+      const DATA_VERSION = "6.1"; // Fixed key namespace
       const currentVersion = localStorage.getItem(this.STORAGE_PREFIX + 'data_version');
 
       if (typeof window !== 'undefined') {
@@ -198,9 +198,8 @@ export class SharePointService {
         this.saveToLocal('pact_appeals', this.getInitialMockAppeals());
         this.saveToLocal('pact_disciplinary', this.getInitialMockDisciplinary());
         
-        if (!localStorage.getItem(this.STORAGE_PREFIX + 'pact_mail_history')) {
-          this.saveToLocal('pact_mail_history', []);
-        }
+        // Force purge of old mail history
+        this.saveToLocal('pact_mail_history', []);
         localStorage.setItem(this.STORAGE_PREFIX + 'data_version', DATA_VERSION);
       }
     } catch (e) {
@@ -742,9 +741,9 @@ export class SharePointService {
     await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL], subject, body, APPEAL_MAIL_TRIGGER_URL);
   }
 
-  private async sendEmailNotification(to: string[], subject: string, body: string, triggerUrl: string = MAIL_TRIGGER_URL): Promise<void> {
-    // ── 1. If a Power Automate webhook is configured, always try it first ──
-    if (triggerUrl) {
+  private async sendEmailNotification(to: string[], subject: string, body: string, triggerUrl: string = MAIL_TRIGGER_URL, logOnly: boolean = false): Promise<void> {
+    // ── 1. If a Power Automate webhook is configured, try it first ──
+    if (triggerUrl && !logOnly) {
       try {
         console.log(`%c [WEBHOOK] %c Posting to Power Automate flow…`, 'background: #5c2d91; color: white; padding: 2px 5px; border-radius: 3px;', 'font-weight: bold;');
         console.log("  Recipients:", to.join(', '));
@@ -763,73 +762,53 @@ export class SharePointService {
           })
         });
 
-        // With no-cors, response is opaque (status 0) which is normal.
         if (response.type !== 'opaque' && !response.ok) {
           throw new Error(`HTTP trigger returned status ${response.status}`);
         }
 
         console.log(`%c [WEBHOOK] %c Email dispatched successfully ✓`, 'background: #107c10; color: white; padding: 2px 5px; border-radius: 3px;', 'font-weight: bold;');
-
-        // Log to SharePoint History list (best-effort, non-blocking in local mode)
-        if (!this.isLocal) {
-          try {
-            const spData = {
-              '__metadata': { 'type': `SP.Data.${LIST_NAMES.MAIL_HISTORY.replace(/ /g, '_x0020_')}ListItem` },
-              [COLUMNS.MAIL.TO]: to.join(', '),
-              [COLUMNS.MAIL.SUBJECT]: subject,
-              [COLUMNS.MAIL.BODY]: body,
-              [COLUMNS.MAIL.STATUS]: 'Sent'
-            };
-            await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.MAIL_HISTORY}')/items`, {
-              method: 'POST',
-              body: JSON.stringify(spData)
-            });
-          } catch (spError) {
-            console.warn("Failed to log webhook email to SharePoint History list:", spError);
-          }
-        }
-
-        // Also persist to local storage for the mock mail history panel
-        const history = this.getFromLocal<any>('pact_mail_history');
-        history.push({
-          id: Date.now(),
-          to,
-          subject,
-          body,
-          timestamp: new Date().toISOString(),
-          status: 'Sent (Webhook)'
-        });
-        this.saveToLocal('pact_mail_history', history);
-
-        return; // Done — webhook succeeded
       } catch (webhookError) {
         console.error("Webhook mail flow failed, falling back:", webhookError);
         // Fall through to local mock or SharePoint REST fallback below
       }
     }
 
-    // ── 2. Local-only console mock (no webhook configured or webhook failed) ──
-    if (this.isLocal) {
-      console.group(`%c [LOCAL MOCK EMAIL] %c ${subject}`, 'background: #0078d4; color: white; padding: 2px 5px; border-radius: 3px;', 'font-weight: bold;');
-      console.log("Recipients:", to.join(', '));
-      console.log("Content Preview:", body.replace(/<[^>]*>?/gm, ' ').substring(0, 100) + '...');
-      console.groupEnd();
-
-      const debugEvent = new CustomEvent('pact-mock-email', { detail: { to, subject } });
-      window.dispatchEvent(debugEvent);
-
-      const history = this.getFromLocal<any>('pact_mail_history');
-      history.push({
-        id: Date.now(),
-        to,
-        subject,
-        body,
-        timestamp: new Date().toISOString(),
-        status: 'Sent (Mock)'
-      });
-      this.saveToLocal('pact_mail_history', history);
-      return;
+    // ── 2. Always log to SharePoint History list ──
+    if (!this.isLocal) {
+      try {
+        const spData = {
+          '__metadata': { 'type': `SP.Data.${LIST_NAMES.MAIL_HISTORY.replace(/ /g, '_x0020_')}ListItem` },
+          [COLUMNS.MAIL.TO]: to.join(', '),
+          [COLUMNS.MAIL.SUBJECT]: subject,
+          [COLUMNS.MAIL.BODY]: body,
+          [COLUMNS.MAIL.STATUS]: logOnly ? 'Logged (Sent via Flow)' : 'Sent (Webhook)'
+        };
+        await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.MAIL_HISTORY}')/items`, {
+          method: 'POST',
+          body: JSON.stringify(spData)
+        });
+      } catch (spError) {
+        console.warn("Failed to log email to SharePoint History list:", spError);
+      }
     }
+
+    // Also persist to local storage for the mock mail history panel
+    const history = this.getFromLocal<any>('pact_mail_history');
+    history.push({
+      id: Date.now(),
+      to,
+      subject,
+      body,
+      timestamp: new Date().toISOString(),
+      status: logOnly ? 'Logged (Sent via Flow)' : 'Sent (Webhook)'
+    });
+    this.saveToLocal('pact_mail_history', history);
+    
+    // Dispatch mock email event for UI toast
+    const debugEvent = new CustomEvent('pact-mock-email', { detail: { to, subject } });
+    window.dispatchEvent(debugEvent);
+    
+    if (logOnly) return;
 
     // ── 3. SP.Utilities.Utility.SendEmail fallback ──
     // This endpoint works natively inside SharePoint page context.
@@ -1020,7 +999,9 @@ export class SharePointService {
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.POLICY_LIBRARY}')/items?$top=500`;
       const data = await this.fetchREST(endpoint);
       if (data && data.results && data.results.length > 0) {
-        return data.results.map((item: any) => {
+        return data.results
+          .filter((item: any) => item.Title && item.Title.trim() !== '')
+          .map((item: any) => {
           const liveTitle = item.Title || '';
           const localMatch = (policyData as PolicyOffence[]).find(
             p => p.offenceName.toLowerCase().trim() === liveTitle.toLowerCase().trim()
@@ -1031,7 +1012,7 @@ export class SharePointService {
             offenceName: liveTitle,
             tier: item.Tier || localMatch?.tier || 'Tier 1',
             category: item.Category || localMatch?.category || '',
-            description: localMatch?.description || '',
+            description: item.Description || item.Title || localMatch?.description || '',
             defaultPenaltyAmount: this.parsePenalty(item.DefaultPenaltyAmount ?? localMatch?.defaultPenaltyAmount ?? 0),
             firstOffenceAction: item.FirstOffenceAction || localMatch?.firstOffenceAction || '',
             secondOffenceAction: item.SecondOffenceAction || localMatch?.secondOffenceAction || '',
@@ -1212,14 +1193,13 @@ export class SharePointService {
     // We no longer build or send the email from the frontend. The Power Automate flow 
     // triggers "When an item is created" in SharePoint and handles the 
     // sequential notifications (Day 0, Day 3, Day 7).
-    /*
     const emailSubject = `PACT ALERT: ${this.expandAbbreviations(policy?.offenceName || 'Compliance Incident')} - ${newCase.chargedPersonName} (Ref: ${newCase.title})`;
-    const emailBody = `...`;
+    const emailBody = `Automated notification handled by Power Automate.`;
     const manager = staff.find(s => s.fullName === person?.lineManager);
     const recipients = [newCase.staffEmail];
     if (manager?.email) recipients.push(manager.email);
-    await this.sendEmailNotification(recipients, emailSubject, emailBody);
-    */
+    // Log the email to the history list without triggering the webhook, because Power Automate sends the actual email.
+    await this.sendEmailNotification(recipients, emailSubject, emailBody, MAIL_TRIGGER_URL, true);
 
     // Tier 3 → Automatic Compliance + Legal notification
     if (policy?.tier === 'Tier 3') {
@@ -1310,10 +1290,9 @@ export class SharePointService {
           } catch (secondTryErr) {
             console.warn("Lookup ID format failed, falling back to basic fields only...", secondTryErr);
             // Complete shock absorber: remove them completely
-            delete spData[COLUMNS.CASES.CHARGED_PERSON + 'Id'];
             delete spData[COLUMNS.CASES.OFFENCE_CATEGORY + 'Id'];
-            delete spData[COLUMNS.CASES.ISSUER_NAME];
-            delete spData[COLUMNS.CASES.SECONDARY_CONTACT];
+            // Restore offence category string so it's not totally blank
+            spData[COLUMNS.CASES.OFFENCE_CATEGORY] = newCase.offenceCategoryName;
             
             const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
             finalResponse = await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items`, {
@@ -1478,7 +1457,7 @@ export class SharePointService {
       totalFines: cases.reduce((sum, c) => sum + c.penaltyAmount, 0),
       casesByTier,
       casesByMonth: last6Months,
-      casesByDepartment: Array.from(new Set(cases.map(c => c.department))).map(dept => ({
+      casesByDepartment: Array.from(new Set(cases.map(c => c.department).filter(dept => dept && dept.trim() !== ''))).map(dept => ({
         department: dept,
         count: cases.filter(c => c.department === dept).length,
         risk: trackers.some(t => {
@@ -2073,18 +2052,24 @@ export class SharePointService {
       if (!this.isLocal) {
         const endpoint = `web/lists/getbytitle('${LIST_NAMES.MAIL_HISTORY}')/items?$orderby=Created desc&$top=50`;
         const data = await this.fetchREST(endpoint);
-        return (data.results || []).map((item: any) => ({
-          id: item.ID.toString(),
-          to: (item[COLUMNS.MAIL.TO] || '').split(',').map((s: string) => s.trim()).filter(Boolean),
-          subject: item[COLUMNS.MAIL.SUBJECT] || item[COLUMNS.MAIL.TITLE],
-          body: item[COLUMNS.MAIL.BODY],
-          timestamp: item.Created,
-          status: item[COLUMNS.MAIL.STATUS] || 'Sent'
-        }));
+        return (data.results || [])
+          .filter((item: any) => {
+            const subj = (item[COLUMNS.MAIL.SUBJECT] || item[COLUMNS.MAIL.TITLE] || '').toLowerCase();
+            return !subj.includes('mock') && !subj.includes('test');
+          })
+          .map((item: any) => ({
+            id: item.ID.toString(),
+            to: (item[COLUMNS.MAIL.TO] || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+            subject: item[COLUMNS.MAIL.SUBJECT] || item[COLUMNS.MAIL.TITLE],
+            body: item[COLUMNS.MAIL.BODY],
+            timestamp: item.Created,
+            status: item[COLUMNS.MAIL.STATUS] || 'Sent'
+          }));
       }
-      return this.getFromLocal<any>('pact_mail_history') || [];
+      // In demo/workbench mode, return empty — real emails are handled by Power Automate
+      return [];
     } catch {
-      return this.getFromLocal<any>('pact_mail_history') || [];
+      return [];
     }
   }
 
@@ -2121,6 +2106,7 @@ export class SharePointService {
         '__metadata': { 'type': `SP.Data.${LIST_NAMES.APPEALS_REGISTER.replace(/ /g, '_x0020_')}ListItem` },
         [COLUMNS.APPEALS.TITLE]: title,
         [COLUMNS.APPEALS.CASE_REFERENCE]: enrichedAppeal.caseReference,
+        [COLUMNS.APPEALS.APPELLANT]: enrichedAppeal.appellant,
         [COLUMNS.APPEALS.APPEAL_DATE]: appealDate,
         [COLUMNS.APPEALS.GROUNDS]: enrichedAppeal.grounds,
         [COLUMNS.APPEALS.DECISION]: 'Pending'
@@ -2222,47 +2208,140 @@ export class SharePointService {
 
     // ── Update linked case status & send decision email ──
     if (updates.decision && appealDetails) {
+      let newCaseStatus: string | undefined;
+      let emailSubject = '';
+      let emailBody = '';
+
       // Get the original case to retrieve the actual user's email address and name
       const originalCase = await this.getCaseByReference(appealDetails.caseReference);
       const userEmail = originalCase?.staffEmail || appealDetails.appellantEmail || 'staff@konstructum.com';
       const userName = originalCase?.chargedPersonName || appealDetails.appellant || 'Employee';
 
-      let newCaseStatus: string | null = null;
-      let emailSubject = '';
-      let emailBody = '';
+      const portalUrl = this.buildCaseResponseLink(
+        appealDetails.caseReference,
+        'accept',
+        {
+          staffName: userName,
+          offenceLabel: originalCase?.offenceCategoryName || 'Compliance Notice',
+          amount: updates.decision === 'Waived' || updates.decision === 'Upheld' ? 0 : (originalCase?.penaltyAmount || 0),
+          dueIso: originalCase?.dueDate || new Date().toISOString(),
+          staffEmail: userEmail,
+          department: originalCase?.department
+        }
+      );
 
       switch (updates.decision) {
         case 'Waived':
           newCaseStatus = CASE_STATUS.WAIVED;
           emailSubject = `APPEAL APPROVED – Penalty Waived: ${appealDetails.caseReference}`;
-          emailBody = `<p>Dear ${userName},</p>
-            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and the penalty has been <b>waived</b>. No further action is required from you.</p>
-            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
-            <p>This matter is now closed.</p>`;
+          emailBody = `
+            <div style="font-family: Arial, sans-serif; color: #333333; max-width: 600px; padding: 20px; border: 2px solid #107c10; border-radius: 8px; background-color: #ffffff;">
+              <h2 style="color: #107c10; margin-top: 0; font-size: 20px;">Appeal Approved: Penalty Waived</h2>
+              <p style="font-size: 15px; line-height: 1.6;">Dear ${userName},</p>
+              <p style="font-size: 15px; line-height: 1.6;">Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and <b>WAIVED</b>.</p>
+              <div style="background-color: #f3fcf5; padding: 15px; border-left: 4px solid #107c10; border-radius: 4px; margin: 20px 0; color: #107c10; font-weight: bold; font-size: 14px;">
+                No penalty payment is required. This case is now officially closed.
+              </div>
+              ${updates.decisionNotes ? `<p style="font-size: 14px; line-height: 1.6; background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px;"><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+              
+              <div style="margin: 25px 0 20px 0;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate;">
+                  <tr>
+                    <td align="center" bgcolor="#107c10" style="border-radius: 4px; padding: 0;">
+                      <a href="${portalUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                        View Case Status
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #64748b; margin: 0;">This is an automated notification from the PACT Compliance Governance Platform.</p>
+            </div>`;
           break;
         case 'Upheld':
           newCaseStatus = CASE_STATUS.WAIVED;
           emailSubject = `APPEAL UPHELD – Penalty Cancelled: ${appealDetails.caseReference}`;
-          emailBody = `<p>Dear ${userName},</p>
-            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been <b>upheld</b>. The original penalty has been cancelled and no payment is required.</p>
-            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
-            <p>This matter is now closed.</p>`;
+          emailBody = `
+            <div style="font-family: Arial, sans-serif; color: #333333; max-width: 600px; padding: 20px; border: 2px solid #107c10; border-radius: 8px; background-color: #ffffff;">
+              <h2 style="color: #107c10; margin-top: 0; font-size: 20px;">Appeal Upheld: Penalty Cancelled</h2>
+              <p style="font-size: 15px; line-height: 1.6;">Dear ${userName},</p>
+              <p style="font-size: 15px; line-height: 1.6;">Your appeal for case <b>${appealDetails.caseReference}</b> has been <b>UPHELD</b>. The original penalty has been cancelled and no payment is required.</p>
+              <div style="background-color: #f3fcf5; padding: 15px; border-left: 4px solid #107c10; border-radius: 4px; margin: 20px 0; color: #107c10; font-weight: bold; font-size: 14px;">
+                No payment is required. This case is now officially closed.
+              </div>
+              ${updates.decisionNotes ? `<p style="font-size: 14px; line-height: 1.6; background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px;"><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+              
+              <div style="margin: 25px 0 20px 0;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate;">
+                  <tr>
+                    <td align="center" bgcolor="#107c10" style="border-radius: 4px; padding: 0;">
+                      <a href="${portalUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                        View Case Status
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #64748b; margin: 0;">This is an automated notification from the PACT Compliance Governance Platform.</p>
+            </div>`;
           break;
         case 'Reduced':
           newCaseStatus = CASE_STATUS.UNPAID;
           emailSubject = `APPEAL PARTIALLY APPROVED – Penalty Reduced: ${appealDetails.caseReference}`;
-          emailBody = `<p>Dear ${userName},</p>
-            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and the penalty has been <b>reduced</b>.</p>
-            ${updates.decisionNotes ? `<p><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
-            <p>Please make payment of the revised amount within the original deadline. You can use the payment link sent in your original notice.</p>`;
+          emailBody = `
+            <div style="font-family: Arial, sans-serif; color: #333333; max-width: 600px; padding: 20px; border: 2px solid #f59e0b; border-radius: 8px; background-color: #ffffff;">
+              <h2 style="color: #f59e0b; margin-top: 0; font-size: 20px;">Appeal Reviewed: Penalty Reduced</h2>
+              <p style="font-size: 15px; line-height: 1.6;">Dear ${userName},</p>
+              <p style="font-size: 15px; line-height: 1.6;">Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and the penalty has been <b>REDUCED</b>.</p>
+              <div style="background-color: #fffbeb; padding: 15px; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0; color: #b45309; font-weight: bold; font-size: 14px;">
+                Please proceed to check the portal to view the revised penalty details and proceed with the response.
+              </div>
+              ${updates.decisionNotes ? `<p style="font-size: 14px; line-height: 1.6; background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px;"><b>Reviewer notes:</b> ${updates.decisionNotes}</p>` : ''}
+              
+              <div style="margin: 25px 0 20px 0;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate;">
+                  <tr>
+                    <td align="center" bgcolor="#f59e0b" style="border-radius: 4px; padding: 0;">
+                      <a href="${portalUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                        View Case Status
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #64748b; margin: 0;">This is an automated notification from the PACT Compliance Governance Platform.</p>
+            </div>`;
           break;
         case 'Rejected':
           newCaseStatus = CASE_STATUS.UNPAID;
           emailSubject = `APPEAL REJECTED – Payment Required: ${appealDetails.caseReference}`;
-          emailBody = `<p>Dear ${userName},</p>
-            <p>Your appeal for case <b>${appealDetails.caseReference}</b> has been <b>rejected</b>. The original penalty stands and must be paid.</p>
-            ${updates.decisionNotes ? `<p><b>Reason:</b> ${updates.decisionNotes}</p>` : ''}
-            <p><b>Please proceed to make your payment immediately using the payment link sent in your original compliance notice.</b> Failure to pay may result in further escalation.</p>`;
+          emailBody = `
+            <div style="font-family: Arial, sans-serif; color: #333333; max-width: 600px; padding: 20px; border: 2px solid #d13438; border-radius: 8px; background-color: #ffffff;">
+              <h2 style="color: #d13438; margin-top: 0; font-size: 20px;">Appeal Rejected: Payment Required</h2>
+              <p style="font-size: 15px; line-height: 1.6;">Dear ${userName},</p>
+              <p style="font-size: 15px; line-height: 1.6;">Your appeal for case <b>${appealDetails.caseReference}</b> has been reviewed and <b>REJECTED</b>. The original penalty stands and must be paid.</p>
+              <div style="background-color: #fde8e8; padding: 15px; border-left: 4px solid #d13438; border-radius: 4px; margin: 20px 0; color: #d13438; font-weight: bold; font-size: 14px;">
+                The original penalty stands. Please proceed to make your payment immediately.
+              </div>
+              ${updates.decisionNotes ? `<p style="font-size: 14px; line-height: 1.6; background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px;"><b>Reason:</b> ${updates.decisionNotes}</p>` : ''}
+              
+              <div style="margin: 25px 0 20px 0;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate;">
+                  <tr>
+                    <td align="center" bgcolor="#d13438" style="border-radius: 4px; padding: 0;">
+                      <a href="${portalUrl}" target="_blank" style="padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; display: inline-block;">
+                        View Case Status
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #64748b; margin: 0;">This is an automated notification from the PACT Compliance Governance Platform.</p>
+            </div>`;
           break;
       }
 
@@ -2372,118 +2451,15 @@ export class SharePointService {
   }
 
   private getInitialMockCases(): ComplianceCase[] {
-    const now = new Date();
-    const lastMonth = new Date(); lastMonth.setMonth(now.getMonth() - 1);
-    const twoMonthsAgo = new Date(); twoMonthsAgo.setMonth(now.getMonth() - 2);
-
-    return [
-      {
-        id: '1', title: 'PACT-1001', chargedPerson: '17', chargedPersonName: 'Ugeh Collins',
-        staffEmail: 'ccugeh.konstructum@outlook.com', department: 'Kadet', offenceCategory: 'p4',
-        offenceCategoryName: 'Late to Work/Site', offenceDescription: 'Arrived 2 hours late without notice.',
-        penaltyAmount: 5000, dueDate: new Date(now.getTime() + 5 * 86400000).toISOString(), issuerName: 'System Admin',
-        secondaryContact: 'Victor Ochi', status: 'Unpaid', dateCreated: now.toISOString()
-      },
-      {
-        id: '2', title: 'PACT-0982', chargedPerson: '16', chargedPersonName: 'Janet Afolabi',
-        staffEmail: 'jafolabi@konstructum.com', department: 'Procurement', offenceCategory: 'p9',
-        offenceCategoryName: 'Procurement Policy Breach', offenceDescription: 'Approved vendor without completing review process.',
-        penaltyAmount: 5000, dueDate: new Date(now.getTime() - 2 * 86400000).toISOString(), issuerName: 'System Admin',
-        secondaryContact: '', status: 'Overdue', dateCreated: lastMonth.toISOString()
-      },
-      {
-        id: '3', title: 'PACT-0945', chargedPerson: '12', chargedPersonName: 'Victor Ochi',
-        staffEmail: 'vochi@konstructum.com', department: 'Engineering', offenceCategory: 'p25',
-        offenceCategoryName: 'Unauthorized Entry or Bringing Unauthorized Persons', offenceDescription: 'Allowed non-staff on site without PTW.',
-        penaltyAmount: 5000, dueDate: new Date(now.getTime() - 15 * 86400000).toISOString(), issuerName: 'System Admin',
-        secondaryContact: 'Abayomi Awobokun', status: 'Paid', dateCreated: twoMonthsAgo.toISOString()
-      },
-      {
-        id: '4', title: 'PACT-1015', chargedPerson: '17', chargedPersonName: 'Ugeh Collins',
-        staffEmail: 'ccugeh.konstructum@outlook.com', department: 'Kadet', offenceCategory: 'p2',
-        offenceCategoryName: 'Dress Policy Contravention', offenceDescription: 'Not wearing proper safety gear on site.',
-        penaltyAmount: 5000, dueDate: new Date(now.getTime() + 8 * 86400000).toISOString(), issuerName: 'System Admin',
-        secondaryContact: 'Victor Ochi', status: 'Unpaid', dateCreated: new Date(now.getTime() - 86400000).toISOString()
-      },
-      {
-        id: '5', title: 'PACT-1008', chargedPerson: '4', chargedPersonName: 'Ayomide Popoola',
-        staffEmail: 'apopoola@konstructum.com', department: 'Procurement', offenceCategory: 'p11',
-        offenceCategoryName: 'Confidentiality Breach', offenceDescription: 'Shared pricing index externally.',
-        penaltyAmount: 5000, dueDate: new Date(now.getTime() + 10 * 86400000).toISOString(), issuerName: 'System Admin',
-        secondaryContact: 'Mojisola Coker', status: 'Unpaid', dateCreated: new Date(now.getTime() - 2 * 86400000).toISOString()
-      }
-    ];
+    return [];
   }
 
   private getInitialMockTrackers(): RepeatOffenceRecord[] {
-    return [
-      {
-        id: "tr1",
-        title: "Ugeh Collins",
-        offender: "26",
-        offenderName: "Ugeh Collins",
-        totalOffences: 2,
-        tier1Last6Months: 2,
-        tier2Offences: 0,
-        tier3Offences: 0,
-        riskLevel: "Medium",
-        lastOffenceDate: new Date(Date.now() - 5 * 86400000).toISOString(),
-        escalationDue: false
-      },
-      {
-        id: "tr2",
-        title: "Babatunde Adeleye",
-        offender: "8",
-        offenderName: "Babatunde Adeleye",
-        totalOffences: 2,
-        tier1Last6Months: 2,
-        tier2Offences: 0,
-        tier3Offences: 0,
-        riskLevel: "Medium",
-        lastOffenceDate: new Date(Date.now() - 10 * 86400000).toISOString(),
-        escalationDue: false
-      },
-      {
-        id: "tr3",
-        title: "Muyis Rafiu Bello",
-        offender: "18",
-        offenderName: "Muyis Rafiu Bello",
-        totalOffences: 2,
-        tier1Last6Months: 2,
-        tier2Offences: 0,
-        tier3Offences: 0,
-        riskLevel: "Medium",
-        lastOffenceDate: new Date(Date.now() - 2 * 86400000).toISOString(),
-        escalationDue: false
-      },
-      {
-        id: "tr4",
-        title: "Ugeh Collins (Legacy)",
-        offender: "17",
-        offenderName: "Ugeh Collins",
-        totalOffences: 2,
-        tier1Last6Months: 2,
-        tier2Offences: 0,
-        tier3Offences: 0,
-        riskLevel: "Medium",
-        lastOffenceDate: new Date(Date.now() - 5 * 86400000).toISOString(),
-        escalationDue: false
-      }
-    ];
+    return [];
   }
 
   private getInitialMockEscalations(): EscalationEntry[] {
-    const now = new Date();
-    const threeDaysAgo = new Date(now.getTime() - 3 * 86400000);
-    return [
-      {
-        id: "esc1", title: "Escalation PACT-0921", caseReference: "PACT-0921",
-        offender: "8", offenderName: "Babatunde Adeleye",
-        escalationReason: "Automatic Policy Trigger: Staff member reached 3 Tier 1 offences within 6 months. Threshold exceeded.",
-        previousTier: "Tier 1", newTier: "Tier 2", triggeredBy: "System",
-        escalationDate: threeDaysAgo.toISOString(), notifiedTo: "HR Manager"
-      }
-    ];
+    return [];
   }
 
   private getInitialMockStaff(): StaffMember[] {
@@ -2495,15 +2471,11 @@ export class SharePointService {
   }
 
   private getInitialMockAppeals(): any[] {
-    return [
-      { id: '1', caseReference: 'PACT-0945', appellant: 'Victor Ochi', appealDate: new Date().toISOString(), grounds: 'Penalty was applied to wrong department.', decision: 'Pending', reviewingOfficer: 'HR Dept' }
-    ];
+    return [];
   }
 
   private getInitialMockDisciplinary(): any[] {
-    return [
-      { id: '1', title: 'P-001', caseReference: 'PACT-0945', actionType: 'Written Warning + CBT', actionDate: '2026-04-10T10:00:00Z', actionedBy: 'PACT Admin', status: 'Enforced', notes: 'Legacy seeded example' }
-    ];
+    return [];
   }
 
   public async getListColumnsDiagnostic(listName: string): Promise<string[]> {

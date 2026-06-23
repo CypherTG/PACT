@@ -137,7 +137,7 @@ export const AppealSubmissionPage: React.FC<Props> = ({ caseData }) => {
             </h3>
             <div className="response-info-grid">
               <div className="response-info-item">
-                <div className="label">Charged person</div>
+                <div className="label">Offender</div>
                 <div className="value">{caseData.chargedPersonName}</div>
               </div>
               <div className="response-info-item">
@@ -152,14 +152,7 @@ export const AppealSubmissionPage: React.FC<Props> = ({ caseData }) => {
                 <div className="label">Penalty amount</div>
                 <div className="value highlight">₦{caseData.penaltyAmount.toLocaleString()}</div>
               </div>
-              {caseData.offenceDescription ? (
-                <div className="response-info-item full-width">
-                  <div className="label">Description</div>
-                  <div className="value" style={{ fontSize: '0.88rem', lineHeight: 1.5, color: '#94a3b8' }}>
-                    {caseData.offenceDescription}
-                  </div>
-                </div>
-              ) : null}
+
             </div>
           </section>
 

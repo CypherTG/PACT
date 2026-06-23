@@ -14,7 +14,7 @@ export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || '
 export const ACCEPT_PAYMENT_TRIGGER_URL = readViteEnv('VITE_ACCEPT_PAYMENT_TRIGGER_URL').trim() || MAIL_TRIGGER_URL; // Accept/payment HTTP Flow URL
 export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/13674850ca7a4f3d92da2893be5d9ad5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bcSyAnrS7dq9AQ1Dza6SDmpP0h0ybnqGPqRvPwsTgw0'; // Appeal HTTP Flow Webhook URL
 export const APPEAL_SLA_DAYS = 3; // Working days for appeal review
-export const PAYMENT_DEADLINE_DAYS = 7; // Days to pay penalty
+export const PAYMENT_DEADLINE_DAYS = 1; // 24 hours to pay penalty
 
 /** Values for PACT Compliance Cases → Status (add matching choices in SharePoint). */
 export const CASE_STATUS = {

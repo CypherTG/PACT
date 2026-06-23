@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useHistory } from 'react-router-dom';
-import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, FileSearch, ShieldAlert, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, AlertTriangle, FileText, Settings, FileSearch, ShieldAlert, Mail, Moon, Sun } from 'lucide-react';
 // import './Layout.css';
 import { sharePointService } from '../services/SharePointService';
 import { WorkbenchBridge } from './Runtime/WorkbenchBridge';
@@ -113,6 +113,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="page-container" data-testid="pact-page-container">
           {children}
         </div>
+        
+        {/* Floating Theme Toggle */}
+        <button
+          className="qa-fab"
+          style={{ bottom: '80px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
+          onClick={() => {
+            const isDark = document.documentElement.getAttribute('data-is-dark-theme') === 'true';
+            document.documentElement.setAttribute('data-is-dark-theme', (!isDark).toString());
+          }}
+          title="Toggle Dark Mode"
+        >
+          <span style={{ display: 'flex', alignItems: 'center' }}>
+            <Moon size={18} style={{ display: 'var(--moon-display, block)' }} />
+          </span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Theme</span>
+        </button>
       </main>
       <WorkbenchBridge />
     </div>

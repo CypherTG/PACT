@@ -128,7 +128,7 @@
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5 & Chairman Session",
     "secondOffenceAction": "P5 & Chairman Session + Termination Possible",
-    "thirdOffenceAction": "Same + Unpaid Leave",
+    "thirdOffenceAction": "P5 & Chairman Session + Termination Possible + Unpaid Leave",
     "escalationTrigger": true
   },
   {
@@ -140,7 +140,7 @@
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5 & Chairman Session",
     "secondOffenceAction": "P5 & Chairman Session + Termination Possible",
-    "thirdOffenceAction": "Same + Unpaid Leave",
+    "thirdOffenceAction": "P5 & Chairman Session + Termination Possible + Unpaid Leave",
     "escalationTrigger": true
   },
   {
@@ -152,7 +152,7 @@
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5 & Chairman Session",
     "secondOffenceAction": "P5 & Chairman Session + Termination Possible",
-    "thirdOffenceAction": "Same + Unpaid Leave",
+    "thirdOffenceAction": "P5 & Chairman Session + Termination Possible + Unpaid Leave",
     "escalationTrigger": true
   },
   {
@@ -164,7 +164,7 @@
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5 & Chairman Session",
     "secondOffenceAction": "P5 & Chairman Session + Termination Possible",
-    "thirdOffenceAction": "Same + Unpaid Leave",
+    "thirdOffenceAction": "P5 & Chairman Session + Termination Possible + Unpaid Leave",
     "escalationTrigger": true
   },
   {
@@ -174,8 +174,8 @@
     "category": "EHSQ",
     "description": "Gross negligence or wilful violation of safety procedures",
     "defaultPenaltyAmount": 0,
-    "firstOffenceAction": "Disciplinary Actions",
-    "secondOffenceAction": "Disciplinary Actions",
+    "firstOffenceAction": "Disciplinary actions",
+    "secondOffenceAction": "Disciplinary actions",
     "thirdOffenceAction": "Termination",
     "escalationTrigger": true
   },
@@ -186,8 +186,8 @@
     "category": "EHSQ",
     "description": "Tampering with company equipment or machinery",
     "defaultPenaltyAmount": 5000,
-    "firstOffenceAction": "Written Warning",
-    "secondOffenceAction": "Suspension (2 week)",
+    "firstOffenceAction": "P5",
+    "secondOffenceAction": "Suspension (2 Weeks)",
     "thirdOffenceAction": "Termination",
     "escalationTrigger": true
   },
@@ -200,7 +200,7 @@
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
     "secondOffenceAction": "P10",
-    "thirdOffenceAction": "Written Warning",
+    "thirdOffenceAction": "P15",
     "escalationTrigger": true
   },
   {
@@ -209,10 +209,10 @@
     "tier": "Tier 1",
     "category": "EHSQ",
     "description": "Failure to complete BUILDSAFE scoreboard requirements",
-    "defaultPenaltyAmount": 10000,
+    "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
     "secondOffenceAction": "P10",
-    "thirdOffenceAction": "Written Warning",
+    "thirdOffenceAction": "P15",
     "escalationTrigger": true
   },
   {
@@ -221,9 +221,9 @@
     "tier": "Tier 2",
     "category": "EHSQ",
     "description": "Falsification of BUILDSAFE scoreboard data",
-    "defaultPenaltyAmount": 0,
-    "firstOffenceAction": "P10 + Written Warning",
-    "secondOffenceAction": "Suspension (2 week)",
+    "defaultPenaltyAmount": 10000,
+    "firstOffenceAction": "P10",
+    "secondOffenceAction": "Suspension (2 Weeks)",
     "thirdOffenceAction": "Termination",
     "escalationTrigger": true
   },
@@ -245,7 +245,7 @@
     "tier": "Tier 3",
     "category": "EHSQ",
     "description": "Substance abuse while on duty",
-    "defaultPenaltyAmount": 5000,
+    "defaultPenaltyAmount": 0,
     "firstOffenceAction": "Termination",
     "secondOffenceAction": "Termination",
     "thirdOffenceAction": "Termination",
@@ -257,10 +257,10 @@
     "tier": "Tier 1",
     "category": "EHSQ",
     "description": "Failure to report incidents within 24 hours",
-    "defaultPenaltyAmount": 100000,
+    "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -269,10 +269,10 @@
     "tier": "Tier 2",
     "category": "EHSQ",
     "description": "Damage to KCC property due to negligence",
-    "defaultPenaltyAmount": 0,
-    "firstOffenceAction": "P10",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Termination",
+    "defaultPenaltyAmount": 5000,
+    "firstOffenceAction": "P5",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -282,8 +282,8 @@
     "category": "EHSQ",
     "description": "Quality non-conformance or record falsification",
     "defaultPenaltyAmount": 5000,
-    "firstOffenceAction": "Suspension (2 week) + Written Warning",
-    "secondOffenceAction": "Suspension (4 week)",
+    "firstOffenceAction": "Suspension (2 Weeks)",
+    "secondOffenceAction": "Suspension (4 Weeks)",
     "thirdOffenceAction": "Termination",
     "escalationTrigger": true
   },
@@ -293,10 +293,10 @@
     "tier": "Tier 1",
     "category": "EHSQ",
     "description": "Unauthorized entry or bringing unauthorized persons to site",
-    "defaultPenaltyAmount": 10000,
+    "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -306,9 +306,9 @@
     "category": "EHSQ",
     "description": "Non-conformance to BUILDSAFE procedures",
     "defaultPenaltyAmount": 5000,
-    "firstOffenceAction": "P10",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "firstOffenceAction": "P5",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -319,7 +319,7 @@
     "description": "Non-conformance to EHSQ policies",
     "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
-    "secondOffenceAction": "Written Warning",
+    "secondOffenceAction": "P10",
     "thirdOffenceAction": "Disciplinary Action",
     "escalationTrigger": true
   },
@@ -329,8 +329,8 @@
     "tier": "Tier 1",
     "category": "EHSQ",
     "description": "Driving without seatbelt or valid licence",
-    "defaultPenaltyAmount": 10000,
-    "firstOffenceAction": "P5 + Written Warning",
+    "defaultPenaltyAmount": 5000,
+    "firstOffenceAction": "P5",
     "secondOffenceAction": "Retrieve Vehicle",
     "thirdOffenceAction": "-",
     "escalationTrigger": true
@@ -341,10 +341,10 @@
     "tier": "Tier 2",
     "category": "EHSQ",
     "description": "Working without valid permit to work",
-    "defaultPenaltyAmount": 0,
+    "defaultPenaltyAmount": 10000,
     "firstOffenceAction": "P10",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "secondOffenceAction": "P15",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -354,7 +354,7 @@
     "category": "EHSQ",
     "description": "Harassment, threats or workplace violence",
     "defaultPenaltyAmount": 0,
-    "firstOffenceAction": "Written Warning + Disciplinary Action",
+    "firstOffenceAction": "Disciplinary Action",
     "secondOffenceAction": "Termination",
     "thirdOffenceAction": "-",
     "escalationTrigger": true
@@ -365,9 +365,9 @@
     "tier": "Tier 3",
     "category": "EHSQ",
     "description": "Mobilization without valid regulatory permits",
-    "defaultPenaltyAmount": 5000,
-    "firstOffenceAction": "Suspension (1 week) + Written Warning",
-    "secondOffenceAction": "Suspension (4 week)",
+    "defaultPenaltyAmount": 0,
+    "firstOffenceAction": "Suspension (1 Week)",
+    "secondOffenceAction": "Suspension (4 Weeks)",
     "thirdOffenceAction": "Termination",
     "escalationTrigger": true
   },
@@ -377,10 +377,10 @@
     "tier": "Tier 2",
     "category": "EHSQ",
     "description": "No HSE officer present on site",
-    "defaultPenaltyAmount": 0,
+    "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   },
   {
@@ -390,8 +390,8 @@
     "category": "EHSQ",
     "description": "Working without personal protective equipment",
     "defaultPenaltyAmount": 5000,
-    "firstOffenceAction": "Verbal Warning",
-    "secondOffenceAction": "Suspension (1 week)",
+    "firstOffenceAction": "P5",
+    "secondOffenceAction": "Suspension (1 Week)",
     "thirdOffenceAction": "Expulsion",
     "escalationTrigger": true
   },
@@ -401,10 +401,10 @@
     "tier": "Tier 2",
     "category": "EHSQ",
     "description": "Non-compliance to EHSQ pre-mobilization requirements",
-    "defaultPenaltyAmount": 0,
+    "defaultPenaltyAmount": 5000,
     "firstOffenceAction": "P5",
-    "secondOffenceAction": "Written Warning",
-    "thirdOffenceAction": "Suspension (2 week)",
+    "secondOffenceAction": "P10",
+    "thirdOffenceAction": "Suspension (2 Weeks)",
     "escalationTrigger": true
   }
 ]

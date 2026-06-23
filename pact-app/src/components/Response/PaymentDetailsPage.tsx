@@ -82,18 +82,17 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
             <div className="penalty-label">Total Penalty Amount</div>
             <div className="penalty-amount">₦{caseData.penaltyAmount.toLocaleString()}</div>
             <div className="penalty-deadline">
-              <Clock size={16} />
-              {isOverdue
-                ? `Overdue by ${Math.abs(daysRemaining)} day(s)`
-                : `Payment deadline: ${PAYMENT_DEADLINE_DAYS} days from date of issue`
-              }
+              <Clock size={16} style={{ marginRight: 6 }} />
+              {isOverdue 
+                ? `Overdue by ${Math.abs(daysRemaining)} days` 
+                : `Payment deadline: 24 hours from date of issue`}
             </div>
           </div>
 
           {/* Case Info Grid */}
           <div className="response-info-grid">
             <div className="response-info-item">
-              <div className="label">Charged Person</div>
+              <div className="label">Offender</div>
               <div className="value">{caseData.chargedPersonName}</div>
             </div>
             <div className="response-info-item">
@@ -112,12 +111,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
                 year: 'numeric'
               })}</div>
             </div>
-            <div className="response-info-item full-width">
-              <div className="label">Description</div>
-              <div className="value" style={{ fontSize: '0.88rem', lineHeight: 1.5, color: '#94a3b8' }}>
-                {caseData.offenceDescription}
-              </div>
-            </div>
+
             <div className="response-info-item">
               <div className="label">Due Date</div>
               <div className="value" style={{ color: isOverdue ? '#ef4444' : '#f59e0b' }}>
@@ -170,7 +164,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
           <div className="deadline-alert">
             <AlertTriangle size={20} className="alert-icon" />
             <div className="alert-text">
-              <strong>Important:</strong> Payment must be made within <strong>{PAYMENT_DEADLINE_DAYS} days</strong> of the 
+              <strong>Important:</strong> Payment must be made within <strong>24 hours</strong> of the 
               date this notice was issued. Failure to pay within the deadline will result in automatic escalation 
               of this case. Please use the case reference <strong>{caseData.title}</strong> as your payment reference 
               to ensure correct allocation.
