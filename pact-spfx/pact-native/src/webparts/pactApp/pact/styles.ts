@@ -11,9 +11,9 @@ const CSS = `
   --primary: #dc2626;
   --primary-hover: #b91c1c;
   --secondary: #6b7280;
-  --text-primary: var(--bodyText, #111827);
-  --text-secondary: var(--bodySubtext, #475569);
-  --text-muted: var(--bodySubtext, #64748b);
+  --text-primary: #111827;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
   --border-light: rgba(0, 0, 0, 0.1);
   --border-focus: rgba(220, 38, 38, 0.5);
   --status-info: #3b82f6;

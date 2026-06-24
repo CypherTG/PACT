@@ -32,9 +32,11 @@ export const StaffProfile: React.FC = () => {
       const decodedId = decodeURIComponent(id || '');
       const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === decodedId || s.fullName === decodedId) || null : null;
       const personCases = Array.isArray(caseList) ? caseList.filter((c: ComplianceCase) => 
-        c.chargedPerson === decodedId || 
-        c.chargedPersonName === decodedId ||
-        (memberRecord && (c.chargedPerson === memberRecord.id || c.chargedPersonName === memberRecord.fullName))
+        !c.title.startsWith('HIST-') && (
+          c.chargedPerson === decodedId || 
+          c.chargedPersonName === decodedId ||
+          (memberRecord && (c.chargedPerson === memberRecord.id || c.chargedPersonName === memberRecord.fullName))
+        )
       ) : [];
       const caseRefs = personCases.map((caseObj: ComplianceCase) => caseObj.title);
       const filteredActions = Array.isArray(actionList)
@@ -148,7 +150,7 @@ export const StaffProfile: React.FC = () => {
             </h3>
             {(() => {
               const t1 = tracker ? (tracker.tier1Last6Months || 0) : 0;
-              const t2 = tracker ? ((tracker.tier2Offences || 0) + Math.floor(t1 / 3)) : 0;
+              const t2 = tracker ? ((tracker.tier2Offences || 0) + Math.floor(t1 / 4)) : 0;
               const t3 = tracker ? ((tracker.tier3Offences || 0) + Math.floor(t2 / 2)) : 0;
               return (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>

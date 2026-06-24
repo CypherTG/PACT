@@ -1,13 +1,83 @@
 import React, { useState } from 'react';
-import { Search, Clock, ChevronDown, ChevronRight, Eye, RefreshCw } from 'lucide-react';
+import { Search, Clock, ChevronDown, ChevronRight, Eye, RefreshCw, UploadCloud } from 'lucide-react';
 import { sharePointService } from '../../services/SharePointService';
 import type { MailLogEntry } from '../../config/types';
 import { useSharePointCollection } from '../../hooks/useSharePointCollection';
+
+import histData from '../../data/historicalData.json';
 
 export const MailLogPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data: logs, loading, refresh } = useSharePointCollection<MailLogEntry>(() => sharePointService.getMailHistory());
+  const [importing, setImporting] = useState(false);
+
+  const handleImportHistorical = async () => {
+    if (!confirm('Are you sure you want to bulk-import 13 historical P5 tracking sheet records? This will delete previous HIST- records.')) return;
+    setImporting(true);
+    try {
+      // 1. Delete existing historical cases
+      const allCases = await sharePointService.getCases();
+      const existingHistCases = allCases.filter(c => c.title.startsWith('HIST-'));
+      for (const hc of existingHistCases) {
+        await sharePointService.deleteCase(hc.id);
+      }
+
+      // 1.5 Delete existing historical disciplinary actions
+      const allActions = await sharePointService.getDisciplinaryActions();
+      const existingHistActions = allActions.filter(a => a.caseReference && a.caseReference.startsWith('HIST-'));
+      for (const ha of existingHistActions) {
+        await sharePointService.deleteDisciplinaryAction(ha.id);
+      }
+
+      // 2. Reset Trackers
+      await sharePointService.resetAllTrackers();
+
+      // 3. Fetch dependencies
+      const staffList = await sharePointService.getStaffDirectory();
+      const policyList = await sharePointService.getPolicyLibrary();
+
+      // 3. Import new data
+      for (const record of histData) {
+        // Find staff matching the exact name
+        const matchedStaff = staffList.find(s => s.fullName === record.employee);
+        
+        // Find policy mapping roughly
+        let matchedPolicy = policyList.find(p => p.offenceName === record.offence);
+        if (!matchedPolicy) {
+          if (record.offence.includes('read presentation')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (record.offence.includes('DDP')) matchedPolicy = policyList.find(p => p.id === '3');
+          if (record.offence.includes('meet deadline')) matchedPolicy = policyList.find(p => p.id === '4');
+          if (record.offence.includes('meeting early')) matchedPolicy = policyList.find(p => p.id === '4');
+          if (record.offence.includes('Naming convention')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (record.offence.includes('upload to dropbox')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (record.offence.includes('Attachment')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (record.offence.includes('Sleeping')) matchedPolicy = policyList.find(p => p.id === '7');
+        }
+
+        const safeName = record.employee && typeof record.employee === 'string' ? record.employee : 'staff';
+        const fallbackEmail = `${safeName.replace(/\s+/g, '.').toLowerCase()}@konstructum.com`;
+
+        const pData: Partial<any> = {
+          chargedPerson: matchedStaff?.id || '',
+          chargedPersonName: record.employee,
+          staffEmail: matchedStaff?.email || fallbackEmail,
+          offenceCategory: matchedPolicy?.id || '1',
+          offenceCategoryName: record.offence,
+          offenceDescription: record.offence,
+          penaltyAmount: record.penalty,
+          status: record.status === 'Paid' ? 'Paid' : 'Unpaid'
+        };
+        
+        await sharePointService.createCase(pData, true);
+      }
+      alert('Historical data imported and mapped successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Error importing data: ' + String(err));
+    }
+    setImporting(false);
+  };
 
   const filteredLogs = (logs || []).filter(log => {
     if (!log) return false;
@@ -52,9 +122,14 @@ export const MailLogPage: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)}>
-          <RefreshCw size={16} /> Refresh
-        </button>
+        <div style={{display: 'flex', gap: '1rem'}}>
+          <button className="btn btn-secondary" onClick={handleImportHistorical} disabled={importing}>
+            <UploadCloud size={16} /> {importing ? 'Importing...' : 'Import P5 History'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)}>
+            <RefreshCw size={16} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="cases-table-container glass-panel">

@@ -62,7 +62,7 @@ export const PolicyLibrary: React.FC = () => {
                   <td>{p.category}</td>
                   <td>
                     {(p.escalationTrigger && p.tier === 'Tier 1')
-                      ? <span className="status-badge" style={{background: 'rgba(233,69,96,0.1)', color: 'var(--primary)'}}>Yes (3 in 6m)</span>
+                      ? <span className="status-badge" style={{background: 'rgba(233,69,96,0.1)', color: 'var(--primary)'}}>Yes (4 in 6m)</span>
                       : <span className="text-muted">No</span>
                     }
                   </td>

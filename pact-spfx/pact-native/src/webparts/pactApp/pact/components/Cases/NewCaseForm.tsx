@@ -62,7 +62,7 @@ export const NewCaseForm: React.FC = () => {
   const offenceCount = useMemo(() => {
     if (!selectedPolicy || !staffHistory) return 1;
     const t1 = staffHistory.tier1Last6Months || 0;
-    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 4);
     const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
     
     if (selectedPolicy.tier === 'Tier 1') return t1 + 1;
@@ -91,7 +91,7 @@ export const NewCaseForm: React.FC = () => {
   const cascadingHistory = useMemo(() => {
     if (!staffHistory) return null;
     const t1 = staffHistory.tier1Last6Months || 0;
-    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 4);
     const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
     return { t1, t2, t3 };
   }, [staffHistory]);

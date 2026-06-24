@@ -49,7 +49,7 @@ export class EscalationEngine {
 
   public calculateRiskLevel(tracker: RepeatOffenceRecord): 'Low' | 'Medium' | 'High' | 'Critical' {
     const t1 = tracker.tier1Last6Months || 0;
-    const t2 = (tracker.tier2Offences || 0) + Math.floor(t1 / 3);
+    const t2 = (tracker.tier2Offences || 0) + Math.floor(t1 / 4);
     const t3 = (tracker.tier3Offences || 0) + Math.floor(t2 / 2);
 
     if (t3 > 0) return 'Critical';
