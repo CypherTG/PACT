@@ -31,7 +31,16 @@ export const NewCaseForm: React.FC = () => {
       sharePointService.getPolicyLibrary()
     ]).then(([staffData, policyData]) => {
       setStaff(staffData.filter(s => s && s.fullName).sort((a, b) => (a.fullName || '').trim().localeCompare((b.fullName || '').trim(), undefined, { sensitivity: 'base' })));
-      setPolicies(policyData);
+      
+      const sortedPolicies = [...policyData].sort((a, b) => {
+        const tierA = (a.tier || '').trim();
+        const tierB = (b.tier || '').trim();
+        if (tierA !== tierB) {
+          return tierA.localeCompare(tierB);
+        }
+        return (a.offenceName || '').localeCompare(b.offenceName || '');
+      });
+      setPolicies(sortedPolicies);
     });
   }, []);
 

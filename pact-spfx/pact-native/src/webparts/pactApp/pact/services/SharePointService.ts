@@ -3,7 +3,7 @@
  * Communicates directly with SharePoint Lists without Azure AD.
  * Bypasses IT/Azure admin requirements.
  */
-import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL, MAIL_TRIGGER_URL, ACCEPT_PAYMENT_TRIGGER_URL, APPEAL_MAIL_TRIGGER_URL, APPEAL_SLA_DAYS, PAYMENT_DEADLINE_DAYS, PAYMENT_PROOFS_LIBRARY, CASE_STATUS, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
+import { SHAREPOINT_SITE_URL, SHAREPOINT_SITE_PATH, LIST_NAMES, COLUMNS, HR_EMAIL, ADMIN_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL, APPEAL_REVIEW_EMAILS, MAIL_TRIGGER_URL, ACCEPT_PAYMENT_TRIGGER_URL, APPEAL_MAIL_TRIGGER_URL, APPEAL_SLA_DAYS, PAYMENT_DEADLINE_DAYS, PAYMENT_PROOFS_LIBRARY, CASE_STATUS, RESPONSE_PORTAL_BASE_URL, CASE_RESPONSE_FROM_EMAIL_QUERY_KEY, CASE_RESPONSE_FROM_EMAIL_QUERY_VALUE } from '../config/constants';
 import type { 
   ComplianceCase, DashboardStats, StaffMember, PolicyOffence, 
   EscalationEntry, RepeatOffenceRecord, UserSession
@@ -745,7 +745,11 @@ export class SharePointService {
         <p style="font-size:13px;color:#666;">Please review in the PACT Appeals Register within ${APPEAL_SLA_DAYS} working days.</p>
       </div>
     `;
-    await this.sendEmailNotification([HR_EMAIL, LEGAL_EMAIL, CHAIRMAN_EMAIL], subject, body, APPEAL_MAIL_TRIGGER_URL);
+    const recipients = [...APPEAL_REVIEW_EMAILS];
+    if (appeal.appellantEmail) {
+      recipients.push(appeal.appellantEmail);
+    }
+    await this.sendEmailNotification(recipients, subject, body, APPEAL_MAIL_TRIGGER_URL);
   }
 
   private async sendEmailNotification(to: string[], subject: string, body: string, triggerUrl: string = MAIL_TRIGGER_URL, logOnly: boolean = false): Promise<void> {
@@ -1100,7 +1104,7 @@ export class SharePointService {
       return val > max ? val : max;
     }, 0);
     const nextNumber = String(maxNumber + 1).padStart(3, '0');
-    const caseTitle = isHistorical ? `HIST-${nextNumber}` : `PACT-${nextNumber}`;
+    const caseTitle = caseData.title ? caseData.title : (isHistorical ? `HIST-${nextNumber}` : `PACT-${nextNumber}`);
 
     const staff = this.isLocal ? this.getFromLocal<StaffMember>('pact_staff') : await this.getStaffDirectory();
     const person = staff.find(s => s.id === caseData.chargedPerson);
@@ -1121,7 +1125,7 @@ export class SharePointService {
       dueDate: caseData.dueDate || new Date().toISOString(),
       issuerName: caseData.issuerName || this.getUserName(),
       secondaryContact: caseData.secondaryContact || person?.lineManager || '',
-      status: 'Unpaid',
+      status: caseData.status || 'Unpaid',
       dateCreated: new Date().toISOString()
     };
 
@@ -1129,49 +1133,16 @@ export class SharePointService {
       console.warn("Policy not found for category:", caseData.offenceCategory);
     }
 
-    // 1. Escalation Logic (Shared for Local & SP)
     const tracker = await this.getRepeatTrackerRecord(newCase.chargedPerson);
     const policyTier = policy?.tier || '';
-
-    // Tier 3: Every single Tier 3 offence triggers immediate escalation
+    
+    // Escalation flags
     const isTier3Escalation = policyTier === 'Tier 3';
-    // Tier 2: Escalate on 2nd+ Tier 2 offence
     const isTier2Escalation = policyTier === 'Tier 2' && escalationEngine.checkTier2Escalation(tracker);
-    // Tier 1: Escalate when this is the 3rd+ Tier 1 in 6 months
     const isTier1Escalation = policyTier === 'Tier 1' && tracker
       ? escalationEngine.checkTier1Escalation(newCase.dateCreated, tracker)
       : false;
-
     const isEscalated = isTier3Escalation || isTier2Escalation || isTier1Escalation;
-
-    if (isEscalated && policy) {
-      let reason = '';
-      let newTier = 'Tier 2';
-      if (isTier3Escalation) {
-        const t3Count = (tracker?.tier3Offences || 0) + 1;
-        reason = `Tier 3 Offence (${policy.offenceName}): Automatic escalation. Occurrence #${t3Count}. Immediate HR & Chairman review required.`;
-        newTier = 'Tier 3';
-      } else if (isTier2Escalation) {
-        reason = `Repeat Tier 2 Offence (${policy.offenceName}): Staff member has ${(tracker?.tier2Offences || 0) + 1} Tier 2 offences on record.`;
-        newTier = 'Tier 3';
-      } else {
-        reason = `Automatic Policy Trigger: Staff member reached 3+ Tier 1 offences within 6 months. Threshold exceeded on case ${newCase.title}.`;
-        newTier = 'Tier 2';
-      }
-
-      try {
-        await this.createEscalation({
-          caseReference: newCase.title,
-          offender: newCase.chargedPerson,
-          offenderName: newCase.chargedPersonName,
-          escalationReason: reason,
-          previousTier: policy.tier,
-          newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
-        });
-      } catch (escErr) {
-        console.warn("Failed to create escalation record:", escErr);
-      }
-    }
 
     const offCount = (tracker?.tier1Last6Months || 0) + (policyTier === 'Tier 1' ? 1 : 0);
     const actionPath = isEscalated ? 'Automatic Escalation' : 
@@ -1180,6 +1151,35 @@ export class SharePointService {
 
 
     if (!isHistorical) {
+      // 1. Escalation Logging
+      if (isEscalated && policy) {
+        let reason = '';
+        let newTier = 'Tier 2';
+        if (isTier3Escalation) {
+          const t3Count = (tracker?.tier3Offences || 0) + 1;
+          reason = `Tier 3 Offence (${policy.offenceName}): Automatic escalation. Occurrence #${t3Count}. Immediate HR & Chairman review required.`;
+          newTier = 'Tier 3';
+        } else if (isTier2Escalation) {
+          reason = `Repeat Tier 2 Offence (${policy.offenceName}): Staff member has ${(tracker?.tier2Offences || 0) + 1} Tier 2 offences on record.`;
+          newTier = 'Tier 3';
+        } else {
+          reason = `Automatic Policy Trigger: Staff member reached 3+ Tier 1 offences within 6 months. Threshold exceeded on case ${newCase.title}.`;
+          newTier = 'Tier 2';
+        }
+
+        try {
+          await this.createEscalation({
+            caseReference: newCase.title,
+            offender: newCase.chargedPerson,
+            offenderName: newCase.chargedPersonName,
+            escalationReason: reason,
+            previousTier: policy.tier,
+            newTier: newTier as "Tier 1" | "Tier 2" | "Tier 3"
+          });
+        } catch (escErr) {
+          console.warn("Failed to create escalation record:", escErr);
+        }
+      }
       // 2. Update Tracker — increment the correct tier counter
       const updatedTier1 = (tracker?.tier1Last6Months || 0) + (policyTier === 'Tier 1' ? 1 : 0);
       const updatedTier2 = (tracker?.tier2Offences || 0) + (policyTier === 'Tier 2' ? 1 : 0);
@@ -1206,7 +1206,7 @@ export class SharePointService {
       const emailSubject = `PACT ALERT: ${this.expandAbbreviations(policy?.offenceName || 'Compliance Incident')} - ${newCase.chargedPersonName} (Ref: ${newCase.title})`;
       const emailBody = `Automated notification handled by Power Automate.`;
       const manager = staff.find(s => s.fullName === person?.lineManager);
-      const recipients = [newCase.staffEmail];
+      const recipients = [newCase.staffEmail, HR_EMAIL, ADMIN_EMAIL];
       if (manager?.email) recipients.push(manager.email);
       await this.sendEmailNotification(recipients, emailSubject, emailBody, MAIL_TRIGGER_URL, true);
 

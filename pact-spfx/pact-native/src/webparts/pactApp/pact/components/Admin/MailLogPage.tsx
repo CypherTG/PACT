@@ -11,9 +11,14 @@ export const MailLogPage: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data: logs, loading, refresh } = useSharePointCollection<MailLogEntry>(() => sharePointService.getMailHistory());
   const [importing, setImporting] = useState(false);
+  const [confirmImport, setConfirmImport] = useState(false);
 
   const handleImportHistorical = async () => {
-    if (!confirm('Are you sure you want to bulk-import 13 historical P5 tracking sheet records? This will delete previous HIST- records.')) return;
+    if (!confirmImport) {
+      setConfirmImport(true);
+      return;
+    }
+    setConfirmImport(false);
     setImporting(true);
     try {
       // 1. Delete existing historical cases
@@ -38,27 +43,35 @@ export const MailLogPage: React.FC = () => {
       const policyList = await sharePointService.getPolicyLibrary();
 
       // 3. Import new data
+      let currentHistId = 1;
+
       for (const record of histData) {
         // Find staff matching the exact name
         const matchedStaff = staffList.find(s => s.fullName === record.employee);
         
         // Find policy mapping roughly
-        let matchedPolicy = policyList.find(p => p.offenceName === record.offence);
+        const recordOffence = String(record.offence || '').trim().toLowerCase();
+        let matchedPolicy = policyList.find(p => String(p.offenceName || '').trim().toLowerCase() === recordOffence);
         if (!matchedPolicy) {
-          if (record.offence.includes('read presentation')) matchedPolicy = policyList.find(p => p.id === '1');
-          if (record.offence.includes('DDP')) matchedPolicy = policyList.find(p => p.id === '3');
-          if (record.offence.includes('meet deadline')) matchedPolicy = policyList.find(p => p.id === '4');
-          if (record.offence.includes('meeting early')) matchedPolicy = policyList.find(p => p.id === '4');
-          if (record.offence.includes('Naming convention')) matchedPolicy = policyList.find(p => p.id === '1');
-          if (record.offence.includes('upload to dropbox')) matchedPolicy = policyList.find(p => p.id === '1');
-          if (record.offence.includes('Attachment')) matchedPolicy = policyList.find(p => p.id === '1');
-          if (record.offence.includes('Sleeping')) matchedPolicy = policyList.find(p => p.id === '7');
+          if (recordOffence.includes('read presentation')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (recordOffence.includes('ddp')) matchedPolicy = policyList.find(p => p.id === '3');
+          if (recordOffence.includes('meet deadline')) matchedPolicy = policyList.find(p => p.id === '4');
+          if (recordOffence.includes('meeting early')) matchedPolicy = policyList.find(p => p.id === '4');
+          if (recordOffence.includes('naming convention')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (recordOffence.includes('upload to dropbox')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (recordOffence.includes('attachment')) matchedPolicy = policyList.find(p => p.id === '1');
+          if (recordOffence.includes('sleeping')) matchedPolicy = policyList.find(p => p.id === '7');
         }
 
         const safeName = record.employee && typeof record.employee === 'string' ? record.employee : 'staff';
         const fallbackEmail = `${safeName.replace(/\s+/g, '.').toLowerCase()}@konstructum.com`;
 
+        const nextNumberStr = String(currentHistId).padStart(3, '0');
+        const caseTitle = `HIST-${nextNumberStr}`;
+        currentHistId++;
+
         const pData: Partial<any> = {
+          title: caseTitle,
           chargedPerson: matchedStaff?.id || '',
           chargedPersonName: record.employee,
           staffEmail: matchedStaff?.email || fallbackEmail,
@@ -123,9 +136,20 @@ export const MailLogPage: React.FC = () => {
           />
         </div>
         <div style={{display: 'flex', gap: '1rem'}}>
-          <button className="btn btn-secondary" onClick={handleImportHistorical} disabled={importing}>
-            <UploadCloud size={16} /> {importing ? 'Importing...' : 'Import P5 History'}
-          </button>
+          {confirmImport ? (
+            <>
+              <button className="btn" style={{background: '#d13438', color: '#fff'}} onClick={handleImportHistorical} disabled={importing}>
+                <UploadCloud size={16} /> Yes, Import Now
+              </button>
+              <button className="btn btn-secondary" onClick={() => setConfirmImport(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-secondary" onClick={handleImportHistorical} disabled={importing}>
+              <UploadCloud size={16} /> {importing ? 'Importing...' : 'Import P5 History'}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => refresh().catch(() => undefined)}>
             <RefreshCw size={16} /> Refresh
           </button>

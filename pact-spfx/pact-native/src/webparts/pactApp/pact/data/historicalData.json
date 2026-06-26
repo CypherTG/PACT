@@ -102,5 +102,197 @@
     "ack": "Not Acknowledged",
     "status": "Paid",
     "dispute": ""
+  },
+  {
+    "employee": "Ubong Ekpenyong",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Keziah Bot",
+    "offence": "Disrespectful Conduct",
+    "penalty": 10000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Damilola Igun",
+    "offence": "Disrespectful Conduct",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Abayomi Awobokun",
+    "offence": "DDP Contravention",
+    "penalty": 20000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Firas Maloouly",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Adesola Ologbosere",
+    "offence": "Disrespectful Conduct",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Firas Maloouly",
+    "offence": "Failure to attend EHSQ training",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Abayomi Awobokun",
+    "offence": "Failure to attend EHSQ training",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Janet Afolabi",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Abayomi Awobokun",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Abayomi Awobokun",
+    "offence": "Failure to read presentation file",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Janet Afolabi",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Olubukola Osibogun",
+    "offence": "DDP Contravention",
+    "penalty": 10000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Olubukola Osibogun",
+    "offence": "Failure to meet deadline",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Odinaka Onaga",
+    "offence": "Unauthorized Absence",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Odinaka Onaga",
+    "offence": "Non-Conformance to EHSQ Policies",
+    "penalty": 15000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Damilola Igun",
+    "offence": "DDP Contravention",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Firas Maloouly",
+    "offence": "DDP Contravention",
+    "penalty": 15000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Abayomi Awobokun",
+    "offence": "Failure to attend EHSQ training",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Vincent Ekumatalor",
+    "offence": "Unauthorised Absence",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Olubukola Osibogun",
+    "offence": "No Peer-Review",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Mojisola Coker",
+    "offence": "Failure to join meeting early",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Eva Kakulu",
+    "offence": "Non-Conformance to EHSQ Policies",
+    "penalty": 10000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
+  },
+  {
+    "employee": "Odinaka Onaga",
+    "offence": "Non-Conformance to EHSQ Policies",
+    "penalty": 5000,
+    "ack": "Acknowledged",
+    "status": "Paid",
+    "dispute": ""
   }
 ]
