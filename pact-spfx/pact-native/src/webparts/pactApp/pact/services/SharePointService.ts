@@ -1730,6 +1730,8 @@ export class SharePointService {
         }
 
         const staffCases = cases.filter(c => {
+          // Exclude historical imports — they must never inflate the tracker
+          if (c.title && c.title.startsWith('HIST-')) return false;
           if (c.chargedPerson === staffId) return true;
           if (targetStaff && c.chargedPersonName && c.chargedPersonName.toLowerCase().trim() === targetStaff.fullName.toLowerCase().trim()) return true;
           return false;
