@@ -288,7 +288,7 @@ export const DashboardPage: React.FC = () => {
                     style={{ 
                       flex: 1, 
                       padding: '8px', 
-                      background: 'rgba(0,0,0,0.2)', 
+                      background: 'var(--bg-input)', 
                       border: '1px solid var(--border-light)', 
                       borderRadius: '6px', 
                       color: 'var(--text-primary)',

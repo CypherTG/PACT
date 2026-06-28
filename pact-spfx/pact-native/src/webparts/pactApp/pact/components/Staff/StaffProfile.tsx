@@ -154,19 +154,19 @@ export const StaffProfile: React.FC = () => {
               const t3 = tracker ? ((tracker.tier3Offences || 0) + Math.floor(t2 / 2)) : 0;
               return (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 1 offences in last 6 months">
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '6px'}} title="Tier 1 offences in last 6 months">
                     <span style={{color: 'var(--text-secondary)'}}>Tier 1 (6m)</span>
                     <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t1}</span>
                   </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 2 offences (including escalations)">
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '6px'}} title="Tier 2 offences (including escalations)">
                     <span style={{color: 'var(--text-secondary)'}}>Tier 2 Total</span>
                     <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t2}</span>
                   </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}} title="Tier 3 offences (including escalations)">
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '6px'}} title="Tier 3 offences (including escalations)">
                     <span style={{color: 'var(--text-secondary)'}}>Tier 3 Total</span>
                     <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{t3}</span>
                   </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(0,0,0,0.02)', borderRadius: '6px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '6px'}}>
                     <span style={{color: 'var(--text-secondary)'}}>Total Breaches</span>
                     <span style={{fontWeight: 600, color: 'var(--text-primary)'}}>{tracker?.totalOffences || 0}</span>
                   </div>

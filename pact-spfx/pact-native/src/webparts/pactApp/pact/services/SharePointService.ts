@@ -1144,9 +1144,10 @@ export class SharePointService {
       : false;
     const isEscalated = isTier3Escalation || isTier2Escalation || isTier1Escalation;
 
-    const offCount = (tracker?.tier1Last6Months || 0) + (policyTier === 'Tier 1' ? 1 : 0);
+    const pTierLower = (policyTier || '').trim().toLowerCase();
+    const offCount = (tracker?.tier1Last6Months || 0) + (pTierLower === 'tier 1' ? 1 : 0);
     const actionPath = isEscalated ? 'Automatic Escalation' : 
-                      (policyTier === 'Tier 1' ? (offCount === 1 ? '1st Offence' : offCount === 2 ? '2nd Offence' : '3rd+ Offence') : 'Standard');
+                      (pTierLower === 'tier 1' ? (offCount === 1 ? '1st Offence' : offCount === 2 ? '2nd Offence' : '3rd+ Offence') : 'Standard');
     const disciplinaryAction = policy ? escalationEngine.getRecommendedAction(policy, offCount, isEscalated) : 'Standard Disciplinary Path';
 
 
@@ -1181,9 +1182,10 @@ export class SharePointService {
         }
       }
       // 2. Update Tracker — increment the correct tier counter
-      const updatedTier1 = (tracker?.tier1Last6Months || 0) + (policyTier === 'Tier 1' ? 1 : 0);
-      const updatedTier2 = (tracker?.tier2Offences || 0) + (policyTier === 'Tier 2' ? 1 : 0);
-      const updatedTier3 = (tracker?.tier3Offences || 0) + (policyTier === 'Tier 3' ? 1 : 0);
+      const pTierLower = (policyTier || '').trim().toLowerCase();
+      const updatedTier1 = (tracker?.tier1Last6Months || 0) + (pTierLower === 'tier 1' ? 1 : 0);
+      const updatedTier2 = (tracker?.tier2Offences || 0) + (pTierLower === 'tier 2' ? 1 : 0);
+      const updatedTier3 = (tracker?.tier3Offences || 0) + (pTierLower === 'tier 3' ? 1 : 0);
 
       const updatedTracker = {
         totalOffences: (tracker?.totalOffences || 0) + 1,

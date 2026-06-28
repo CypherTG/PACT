@@ -74,9 +74,10 @@ export const NewCaseForm: React.FC = () => {
     const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 4);
     const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
     
-    if (selectedPolicy.tier === 'Tier 1') return t1 + 1;
-    if (selectedPolicy.tier === 'Tier 2') return t2 + 1;
-    if (selectedPolicy.tier === 'Tier 3') return t3 + 1;
+    const pTier = (selectedPolicy.tier || '').trim().toLowerCase();
+    if (pTier === 'tier 1') return t1 + 1;
+    if (pTier === 'tier 2') return t2 + 1;
+    if (pTier === 'tier 3') return t3 + 1;
     return 1;
   }, [selectedPolicy, staffHistory]);
   
@@ -98,12 +99,24 @@ export const NewCaseForm: React.FC = () => {
   }, [offenceCount]);
 
   const cascadingHistory = useMemo(() => {
-    if (!staffHistory) return null;
-    const t1 = staffHistory.tier1Last6Months || 0;
-    const t2 = (staffHistory.tier2Offences || 0) + Math.floor(t1 / 4);
-    const t3 = (staffHistory.tier3Offences || 0) + Math.floor(t2 / 2);
-    return { t1, t2, t3 };
-  }, [staffHistory]);
+    let t1 = staffHistory?.tier1Last6Months || 0;
+    let t2 = staffHistory?.tier2Offences || 0;
+    let t3 = staffHistory?.tier3Offences || 0;
+
+    // Add the currently selected policy to the preview
+    if (selectedPolicy) {
+      const pTier = (selectedPolicy.tier || '').trim().toLowerCase();
+      if (pTier === 'tier 1') t1 += 1;
+      if (pTier === 'tier 2') t2 += 1;
+      if (pTier === 'tier 3') t3 += 1;
+    }
+
+    // Apply the escalation math
+    const escalatedT2 = t2 + Math.floor(t1 / 4);
+    const escalatedT3 = t3 + Math.floor(escalatedT2 / 2);
+
+    return { t1, t2: escalatedT2, t3: escalatedT3 };
+  }, [staffHistory, selectedPolicy]);
 
   const riskColor = useMemo(() => {
     if (!staffHistory) return 'var(--text-secondary)';
@@ -186,7 +199,7 @@ export const NewCaseForm: React.FC = () => {
               required
               className="form-input"
               data-testid="case-offender-select"
-              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+              style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
             >
               <option value="">-- Select Offender --</option>
               {staff.map(member => (
@@ -196,7 +209,7 @@ export const NewCaseForm: React.FC = () => {
           </div>
 
           {selectedStaff && (
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ padding: '16px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', animation: 'fadeIn 0.2s ease' }}>
               <div>
                 <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Department</div>
                 <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedStaff.department}</div>
@@ -216,7 +229,7 @@ export const NewCaseForm: React.FC = () => {
               required
               className="form-input"
               data-testid="case-policy-select"
-              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+              style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
             >
               <option value="">-- Select Infraction --</option>
               {policies.map(policy => (
@@ -240,7 +253,7 @@ export const NewCaseForm: React.FC = () => {
                 </div>
               </div>
               
-              <div style={{ background: 'rgba(0,0,0,0.05)', padding: '12px', borderRadius: '4px' }}>
+              <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Incident Context</div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: riskColor }}>
@@ -274,7 +287,7 @@ export const NewCaseForm: React.FC = () => {
               rows={4}
               placeholder="Describe the specific details of the compliance breach..."
               data-testid="case-description"
-              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical' }}
+              style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical' }}
             />
           </div>
 
@@ -298,7 +311,7 @@ export const NewCaseForm: React.FC = () => {
                 borderRadius: '8px', 
                 padding: '32px', 
                 textAlign: 'center',
-                background: 'rgba(0,0,0,0.02)',
+                background: 'var(--bg-input)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
@@ -317,7 +330,7 @@ export const NewCaseForm: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', marginTop: '8px' }}>
+          <div style={{ padding: '16px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', marginTop: '8px' }}>
             <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '8px' }}>Notification Preview</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>

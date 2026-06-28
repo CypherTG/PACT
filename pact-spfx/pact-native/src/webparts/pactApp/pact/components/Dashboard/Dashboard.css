@@ -128,13 +128,13 @@
   gap: 16px;
   padding: 12px;
   border-radius: var(--radii-md);
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-input);
   border: 1px solid var(--border-light);
   transition: background 0.2s ease;
 }
 
 .activity-item:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--bg-hover);
 }
 
 .activity-indicator {

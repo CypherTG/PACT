@@ -8,6 +8,8 @@ const CSS = `
   --bg-surface: #ffffff;
   --bg-surface-hover: #f3f4f6;
   --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-input: rgba(0, 0, 0, 0.02);
+  --bg-hover: rgba(0, 0, 0, 0.04);
   --primary: #dc2626;
   --primary-hover: #b91c1c;
   --secondary: #6b7280;
@@ -42,12 +44,65 @@ const CSS = `
   --bg-surface: #1e293b;
   --bg-surface-hover: #334155;
   --bg-card: rgba(30, 41, 59, 0.95);
+  --bg-input: rgba(255, 255, 255, 0.06);
+  --bg-hover: rgba(255, 255, 255, 0.06);
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
   --border-light: rgba(255, 255, 255, 0.1);
   --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Dark Theme Component Overrides ─────────────────────────────────── */
+[data-is-dark-theme="true"] .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 936px 100%;
+}
+
+[data-is-dark-theme="true"] .activity-item {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-is-dark-theme="true"] .activity-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-is-dark-theme="true"] .nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-is-dark-theme="true"] .pact-table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-is-dark-theme="true"] .qa-panel {
+  background: var(--bg-card);
+}
+
+[data-is-dark-theme="true"] .qa-stat {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-is-dark-theme="true"] .form-input {
+  background: var(--bg-input);
+}
+
+[data-is-dark-theme="true"] select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+[data-is-dark-theme="true"] .header-welcome h1 {
+  color: var(--text-primary) !important;
+}
+
+[data-is-dark-theme="true"] .header-welcome p {
+  color: var(--text-secondary) !important;
+}
+
+[data-is-dark-theme="true"] .page-title {
+  color: var(--text-primary) !important;
 }
 
 [data-is-dark-theme="true"] body {
@@ -153,7 +208,7 @@ a:hover { color: var(--primary-hover); }
 
 .fade-in { animation: fadeIn 0.4s ease-out forwards; }
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, var(--bg-surface-hover) 25%, var(--bg-surface) 50%, var(--bg-surface-hover) 75%);
   background-size: 936px 100%;
   animation: shimmer 2s infinite linear;
   border-radius: 4px;
@@ -191,7 +246,7 @@ a:hover { color: var(--primary-hover); }
   color: var(--text-secondary);
 }
 
-.pact-table tr:hover td { background: rgba(0, 0, 0, 0.02); }
+.pact-table tr:hover td { background: var(--bg-hover); }
 
 .status-badge {
   padding: 4px 10px;
@@ -253,8 +308,8 @@ a:hover { color: var(--primary-hover); }
 .chart-wrapper { height: 300px; width: 100%; }
 .dashboard-lists-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
 .activity-list { display: flex; flex-direction: column; gap: 16px; }
-.activity-item { display: flex; gap: 16px; padding: 12px; border-radius: var(--radii-md); background: rgba(0, 0, 0, 0.02); border: 1px solid var(--border-light); transition: background 0.2s ease; }
-.activity-item:hover { background: rgba(0, 0, 0, 0.05); }
+.activity-item { display: flex; gap: 16px; padding: 12px; border-radius: var(--radii-md); background: var(--bg-input); border: 1px solid var(--border-light); transition: background 0.2s ease; }
+.activity-item:hover { background: var(--bg-hover); }
 .activity-indicator { width: 4px; border-radius: 2px; flex-shrink: 0; }
 .activity-indicator.severity-low { background-color: var(--status-info); }
 .activity-indicator.severity-medium { background-color: var(--status-warning); }
@@ -337,7 +392,7 @@ a:hover { color: var(--primary-hover); }
   text-decoration: none;
   transition: all 0.2s ease; 
 }
-.nav-link:hover { background: rgba(0, 0, 0, 0.05); color: var(--primary); }
+.nav-link:hover { background: var(--bg-hover); color: var(--primary); }
 .nav-link.active { background: linear-gradient(90deg, rgba(220, 38, 38, 0.1), transparent); color: var(--primary); border-left: 3px solid var(--primary); }
 .nav-icon { opacity: 0.8; }
 
@@ -394,7 +449,7 @@ a:hover { color: var(--primary-hover); }
 
 .app-header {
   height: var(--header-height);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bg-card);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-light);
   display: flex;
@@ -409,14 +464,14 @@ a:hover { color: var(--primary-hover); }
 .header-welcome h1 {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #111827 !important;
+  color: var(--text-primary);
   margin: 0;
 }
 .header-welcome p {
   font-size: 0.875rem;
-  color: #4b5563 !important;
+  color: var(--text-secondary);
 }
-.page-title { font-size: 1.5rem; font-weight: 800; margin: 0; color: #111827 !important; }
+.page-title { font-size: 1.5rem; font-weight: 800; margin: 0; color: var(--text-primary); }
 .header-left { display: flex; flex-direction: column; gap: 4px; }
 .header-subtitle { font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .header-actions { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -686,7 +741,7 @@ body {
   z-index: 60;
   width: min(360px, calc(100vw - 36px));
   padding: 16px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--bg-card);
 }
 
 .qa-panel-header {
@@ -730,7 +785,7 @@ body {
 .qa-stat {
   padding: 10px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-input);
   border: 1px solid var(--border-light);
 }
 
