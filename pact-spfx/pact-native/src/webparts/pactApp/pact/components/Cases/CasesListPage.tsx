@@ -105,7 +105,7 @@ export const CasesListPage: React.FC = () => {
                   </td>
                   <td>{c.department}</td>
                   <td>{c.offenceCategoryName || 'Unknown'}</td>
-                  <td>{getSafeDate(c.dueDate)}</td>
+                  <td>{getSafeDate(c.dateCreated || '')}</td>
                   <td>
                     <span className={`status-badge status-${(c.status || '').toLowerCase().replace(/\s+/g, '')}`}>
                       {c.status}
