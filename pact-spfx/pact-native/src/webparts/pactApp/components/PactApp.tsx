@@ -2,6 +2,7 @@ import * as React from 'react';
 import { App } from '../pact/App';
 import { SharePointService, sharePointService } from '../pact/services/SharePointService';
 import { IPactAppProps } from './IPactAppProps';
+import { PactLauncher } from './PactLauncher';
 import '../pact/styles';
 
 export interface IAppContext {
@@ -223,112 +224,7 @@ export default class PactApp extends React.Component<IPactAppProps, PactAppState
         userDisplayName
       }}>
         <ErrorBoundary>
-          {/* Custom Styles for Startup Card */}
-          <style>{`
-            .pact-startup-container {
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              padding: 3rem 1.5rem;
-              font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-              background: transparent;
-            }
-            .pact-startup-card {
-              background: #FFFFFF;
-              border: 1px solid #E0E0E0 !important;
-              border-radius: 8px;
-              padding: 3rem 3rem;
-              max-width: 580px;
-              width: 100%;
-              box-shadow: none !important;
-              text-align: center;
-              box-sizing: border-box;
-              transition: all 0.3s ease;
-            }
-            .pact-startup-card:hover {
-              box-shadow: none !important;
-              transform: none !important;
-            }
-            .pact-startup-logo {
-              width: 64px;
-              height: 64px;
-              margin: 0 auto 1.5rem;
-              background: transparent;
-              border-radius: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 48px;
-              font-family: serif;
-              font-weight: bold;
-              color: #1A1A1A;
-              box-shadow: none;
-              overflow: hidden;
-            }
-            .pact-startup-title {
-              font-size: 20px;
-              font-weight: 700;
-              color: #1A1A1A;
-              margin: 0 0 0.5rem;
-            }
-            .pact-startup-subtitle {
-              font-size: 11px;
-              color: #C0272D;
-              font-weight: 600;
-              margin: 0 0 1.25rem;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-            }
-            .pact-startup-desc {
-              font-size: 13px;
-              color: #666666;
-              line-height: 1.6;
-              margin-bottom: 2rem;
-            }
-            .pact-startup-btn {
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              width: 100%;
-              padding: 0.85rem 1.5rem;
-              background: #C0272D;
-              color: white;
-              font-size: 14px;
-              font-weight: 600;
-              border: none;
-              border-radius: 6px;
-              cursor: pointer;
-              box-shadow: none;
-              transition: all 0.2s ease;
-              gap: 8px;
-            }
-            .pact-startup-btn:hover {
-              transform: translateY(-1px);
-              background: #A02025;
-              box-shadow: none;
-            }
-          `}</style>
-
-          <div className="pact-startup-container">
-            <div className="pact-startup-card">
-              <div className="pact-startup-logo" style={{ overflow: 'hidden', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
-                <img src={require('../pact/assets/kcc-logo.png')} alt="KCC" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </div>
-              <h2 className="pact-startup-title">PACT Portal</h2>
-              <p className="pact-startup-desc">
-                Policy, Accountability &amp; Compliance Tracking Platform. Securely manage compliance cases, disciplinary metrics, and mail logs.
-              </p>
-              <button 
-                type="button" 
-                className="pact-startup-btn" 
-                onClick={() => {
-                  this.setState({ isOpen: true });
-                }}
-              >
-                Open PACT Portal
-              </button>
-            </div>
-          </div>
+          <PactLauncher onOpen={() => this.setState({ isOpen: true })} />
         </ErrorBoundary>
       </AppContext.Provider>
     );

@@ -1,0 +1,198 @@
+/* =============================================================================
+   PactLauncher.module.css
+   Fluent UI / Microsoft 365-aligned launcher card styles for the PACT SPFx
+   web part idle (startup) view.
+
+   Design targets
+   ──────────────
+   • Desktop (>1200px) : up to 4 tiles per row (auto-fit handles this)
+   • Laptop (~900–1200px): 3 tiles
+   • Tablet (~600–900px) : 2 tiles
+   • Mobile (<600px)    : 1 tile per row
+
+   All sizing is driven by CSS Grid auto-fit + minmax — no fixed pixel widths
+   on the container itself.
+   ============================================================================= */
+
+/* ── Container ─────────────────────────────────────────────────────────────── */
+
+.launcherSection {
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cardsContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e1e1e1;
+  border-radius: 6px;
+  min-height: 190px;
+  max-width: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px 16px;
+  box-sizing: border-box;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  /* Subtle resting shadow to lift cards off the page */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  border-color: #c8c8c8;
+}
+
+/* WCAG AA keyboard focus ring (only shown for keyboard nav, not mouse) */
+.card:focus-visible {
+  outline: 2px solid #0078d4;
+  outline-offset: 3px;
+}
+
+/* ── Logo ───────────────────────────────────────────────────────────────────── */
+
+.logoWrapper {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Title ──────────────────────────────────────────────────────────────────── */
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+  /* Vertically consume remaining space so the button always sits at bottom */
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Description (optional) ─────────────────────────────────────────────────── */
+
+.description {
+  font-size: 13px;
+  font-weight: 400;
+  color: #616161;
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* ── Action button ──────────────────────────────────────────────────────────── */
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 12px;
+  background: #C0272D;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  /* 36px minimum touch target height (WCAG 2.5.5) */
+  min-height: 36px;
+  letter-spacing: 0.1px;
+}
+
+.actionButton:hover {
+  background: #A02025;
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid #0078d4;
+  outline-offset: 2px;
+  background: #A02025;
+}
+
+.actionButton:active {
+  background: #8B1B20;
+}
+
+/* ── Responsive breakpoints ─────────────────────────────────────────────────── */
+
+/* Tablet: ensure minimum 2 columns even if tiles would prefer to be wider */
+@media (max-width: 900px) {
+  .cardsContainer {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+  }
+
+  .card {
+    min-height: 180px;
+    padding: 16px 14px 14px;
+  }
+}
+
+/* Mobile: single column */
+@media (max-width: 600px) {
+  .cardsContainer {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .card {
+    max-width: 100%;
+    min-height: 160px;
+    padding: 16px 14px 14px;
+  }
+
+  .logoWrapper {
+    width: 48px;
+    height: 48px;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .actionButton {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+}
