@@ -12,12 +12,18 @@ import {
   BarChart, Bar, Legend
 } from './recharts-shim';
 import { sharePointService } from '../../services/SharePointService';
-import type { DashboardStats } from '../../config/types';
+import type { ComplianceCase, EscalationEntry, RepeatOffenceRecord, StaffMember } from '../../config/types';
 import { Mail, CheckCircle, Clock } from 'lucide-react';
 import './Dashboard.css';
 
 export const DashboardPage: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [allCases, setAllCases] = useState<ComplianceCase[]>([]);
+  const [allEscalations, setAllEscalations] = useState<EscalationEntry[]>([]);
+  const [allTrackers, setAllTrackers] = useState<RepeatOffenceRecord[]>([]);
+  const [allAppeals, setAllAppeals] = useState<any[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffMember[]>([]);
+
+  const [selectedCompany, setSelectedCompany] = useState<string>('All');
   const [loading, setLoading] = useState(true);
   const [mailLogs, setMailLogs] = useState<any[]>([]);
 
@@ -49,22 +55,124 @@ export const DashboardPage: React.FC = () => {
     setDiagnosticLoading(false);
   };
 
-  const loadDashboard = () => {
-    sharePointService.getDashboardStats().then(data => {
-      setStats(data);
-      setLoading(false);
-    });
-    sharePointService.getMailHistory().then(history => {
+  const loadDashboard = async () => {
+    try {
+      const [cases, escalations, trackers, appeals, staff, history] = await Promise.all([
+        sharePointService.getCases(),
+        sharePointService.getEscalationLog(),
+        sharePointService.getRepeatTrackerRecords(),
+        sharePointService.getAppeals(),
+        sharePointService.getStaffDirectory(),
+        sharePointService.getMailHistory()
+      ]);
+
+      setAllCases(cases);
+      setAllEscalations(escalations);
+      setAllTrackers(trackers);
+      setAllAppeals(appeals);
+      setAllStaff(staff);
+
       if (Array.isArray(history)) {
         setMailLogs(history.slice(0, 5));
       }
-    });
+      setLoading(false);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+      setLoading(false);
+    }
   };
+
+  // Filter cases, escalations, trackers, appeals based on selected company
+  const filteredData = React.useMemo(() => {
+    if (selectedCompany === 'All') {
+      return {
+        cases: allCases,
+        escalations: allEscalations,
+        trackers: allTrackers,
+        appeals: allAppeals
+      };
+    }
+
+    const filteredCases = allCases.filter(c => {
+      const staff = allStaff.find(s => s.id === c.chargedPerson || s.fullName === c.chargedPersonName || s.email === c.staffEmail);
+      return staff?.company === selectedCompany;
+    });
+
+    const filteredEscalations = allEscalations.filter(e => {
+      const staff = allStaff.find(s => s.id === e.offender || s.fullName === e.offenderName);
+      return staff?.company === selectedCompany;
+    });
+
+    const filteredTrackers = allTrackers.filter(t => {
+      const staff = allStaff.find(s => s.id === t.offender || s.fullName === t.offenderName);
+      return staff?.company === selectedCompany;
+    });
+
+    const filteredAppeals = allAppeals.filter(a => {
+      const staff = allStaff.find(s => s.id === a.appellant || s.fullName === a.appellant);
+      return staff?.company === selectedCompany;
+    });
+
+    return {
+      cases: filteredCases,
+      escalations: filteredEscalations,
+      trackers: filteredTrackers,
+      appeals: filteredAppeals
+    };
+  }, [allCases, allEscalations, allTrackers, allAppeals, allStaff, selectedCompany]);
+
+  // Rebuild stats using filtered data
+  const stats = React.useMemo(() => {
+    if (!filteredData.cases.length && selectedCompany !== 'All') {
+      return {
+        totalActiveCases: 0,
+        paidCases: 0,
+        appealPendingCases: 0,
+        escalationsThisMonth: 0,
+        pendingAppeals: 0,
+        repeatOffenders: 0,
+        totalFines: 0,
+        casesByTier: [{ tier: 'Tier 1', count: 0 }, { tier: 'Tier 2', count: 0 }, { tier: 'Tier 3', count: 0 }],
+        casesByMonth: [],
+        casesByDepartment: [],
+        recentActivity: []
+      };
+    }
+    return sharePointService.buildDashboardStats(
+      filteredData.cases,
+      filteredData.escalations,
+      filteredData.trackers,
+      filteredData.appeals
+    );
+  }, [filteredData, selectedCompany]);
+
+  // Calculate Recovery Progress parameters
+  const paidFines = React.useMemo(() => {
+    return filteredData.cases
+      .filter(c => c.status === 'Paid')
+      .reduce((sum, c) => sum + c.penaltyAmount, 0);
+  }, [filteredData.cases]);
+
+  const totalFines = React.useMemo(() => {
+    return stats.totalFines;
+  }, [stats]);
+
+  const recoveryRate = React.useMemo(() => {
+    return totalFines > 0 ? Math.round((paidFines / totalFines) * 100) : 0;
+  }, [paidFines, totalFines]);
+
+  // Find any active Tier 3 (critical) escalation or case for the alert banner
+  const criticalItem = React.useMemo(() => {
+    return filteredData.cases.find(c => c.tier === 'Tier 3' && c.status !== 'Paid' && c.status !== 'Waived');
+  }, [filteredData.cases]);
 
   useEffect(() => {
     loadDashboard();
 
-    const handleDataChanged = () => loadDashboard();
+    const handleDataChanged = () => {
+      sharePointService.clearCache();
+      loadDashboard();
+    };
     window.addEventListener('pact-data-changed', handleDataChanged);
 
     const handleMailEvent = (e: any) => {
@@ -88,11 +196,11 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="dashboard-container">
         <div className="kpi-grid">
-          {[1,2,3,4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{height: '100px'}}></div>)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="kpi-card glass-panel skeleton" style={{ height: '120px', borderRadius: '12px' }}></div>)}
         </div>
-        <div className="dashboard-charts-grid" style={{marginTop: '2rem'}}>
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
-          <div className="chart-panel glass-panel skeleton" style={{height: '400px'}}></div>
+        <div className="dashboard-charts-grid" style={{ marginTop: '2rem' }}>
+          <div className="chart-panel glass-panel skeleton" style={{ height: '400px', borderRadius: '12px' }}></div>
+          <div className="chart-panel glass-panel skeleton" style={{ height: '400px', borderRadius: '12px' }}></div>
         </div>
       </div>
     );
@@ -100,47 +208,109 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="dashboard-container fade-in" data-testid="dashboard-page">
-      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '16px' }}>
         <h2 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>Compliance Dashboard</h2>
-        <NavLink to="/cases/new" className="btn btn-primary" data-testid="dashboard-new-case-button">
-          <Plus size={16} /> Log New Case
-        </NavLink>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {/* Company filter */}
+          <div className="company-filter-wrapper">
+            <label htmlFor="company-filter">View by:</label>
+            <select
+              id="company-filter"
+              value={selectedCompany}
+              onChange={e => setSelectedCompany(e.target.value)}
+              className="company-select-input"
+            >
+              <option value="All">All Companies</option>
+              <option value="KCC">KCC</option>
+              <option value="KESL">KESL</option>
+              <option value="Interkonstruct">Interkonstruct</option>
+              <option value="PMT7">PMT7</option>
+            </select>
+          </div>
+
+          <NavLink to="/cases/new" className="btn btn-primary" data-testid="dashboard-new-case-button" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Plus size={16} /> Log New Case
+          </NavLink>
+        </div>
       </div>
+
+      {/* Critical Violation Alert Banner */}
+      {criticalItem && (
+        <div className="high-priority-banner">
+          <div className="banner-icon">
+            <ShieldAlert size={28} />
+          </div>
+          <div className="banner-content">
+            <h4 className="banner-title">Critical Attention Required</h4>
+            <p className="banner-desc">
+              Case <strong>{criticalItem.title}</strong> ({criticalItem.chargedPersonName}) is flagged as a <strong>Tier 3 (Critical)</strong> breach. Immediate follow-up is recommended.
+            </p>
+          </div>
+          <NavLink to={`/cases`} className="banner-action-btn" style={{ textDecoration: 'none' }}>
+            Review Cases
+          </NavLink>
+        </div>
+      )}
 
       {/* Top KPI Summary Cards */}
       <div className="kpi-grid">
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon info"><ShieldAlert size={24} /></div>
-          <div className="kpi-content">
+        {/* Open Cases */}
+        <div className="kpi-card glass-panel" style={{ borderLeft: '4px solid var(--primary)', position: 'relative' }}>
+          <div className="kpi-icon info" style={{ background: 'linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(233, 69, 96, 0.05))', color: 'var(--primary)' }}>
+            <ShieldAlert size={24} />
+          </div>
+          <div className="kpi-content" style={{ flex: 1 }}>
             <span className="kpi-label">Open Cases</span>
             <span className="kpi-value">{stats.totalActiveCases}</span>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-              {stats.paidCases} paid · {stats.appealPendingCases} appeal pending
+              {stats.paidCases} paid · {stats.appealPendingCases} in appeal
             </span>
           </div>
         </div>
-        
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon warning"><AlertTriangle size={24} /></div>
+
+        {/* Escalations */}
+        <div className="kpi-card glass-panel" style={{ borderLeft: '4px solid var(--status-warning)' }}>
+          <div className="kpi-icon warning" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05))', color: 'var(--status-warning)' }}>
+            <AlertTriangle size={24} />
+          </div>
           <div className="kpi-content">
-            <span className="kpi-label">Escalations This Month</span>
+            <span className="kpi-label">Escalations (Month)</span>
             <span className="kpi-value">{stats.escalationsThisMonth}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+              Requires review
+            </span>
           </div>
         </div>
 
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon primary"><TrendingUp size={24} /></div>
-          <div className="kpi-content">
-            <span className="kpi-label">Financial Recovery</span>
+        {/* Financial Recovery (Includes Progress Gauge) */}
+        <div className="kpi-card glass-panel" style={{ borderLeft: '4px solid #10b981', minHeight: '120px' }}>
+          <div className="kpi-content" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
+              <span className="kpi-label">Recovery Rate</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>{recoveryRate}%</span>
+            </div>
             <span className="kpi-value">₦{stats.totalFines.toLocaleString()}</span>
+            <div className="recovery-progress-container">
+              <div className="recovery-progress-bar" style={{ width: `${recoveryRate}%` }}></div>
+            </div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 6, display: 'inline-block' }}>
+              ₦{paidFines.toLocaleString()} recovered of total
+            </span>
           </div>
         </div>
 
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon danger"><Users size={24} /></div>
+        {/* Repeat Offenders */}
+        <div className="kpi-card glass-panel" style={{ borderLeft: '4px solid #ef4444' }}>
+          <div className="kpi-icon danger" style={{ background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05))', color: '#ef4444' }}>
+            <Users size={24} />
+          </div>
           <div className="kpi-content">
-            <span className="kpi-label">Repeat Offenders Watch</span>
+            <span className="kpi-label">Repeat Offenders</span>
             <span className="kpi-value">{stats.repeatOffenders}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+              Active watch list
+            </span>
           </div>
         </div>
       </div>

@@ -1010,6 +1010,18 @@ export class SharePointService {
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 
+  public isStandalone(): boolean {
+    return true; // Vite standalone is always in demo mode
+  }
+
+  public getRuntimeLabel(): string {
+    return 'Vite Dev Standalone';
+  }
+
+  public getUserName(): string {
+    return 'PACT Administrator';
+  }
+
   public async getCases(): Promise<ComplianceCase[]> {
     const cacheKey = 'cases';
     const cached = this.getCached<ComplianceCase[]>(cacheKey);
@@ -1580,7 +1592,7 @@ export class SharePointService {
     }
   }
 
-  private buildDashboardStats(
+  public buildDashboardStats(
     cases: ComplianceCase[],
     escalations: EscalationEntry[],
     trackers: RepeatOffenceRecord[],
@@ -1876,7 +1888,7 @@ export class SharePointService {
     }
   }
 
-  private async getRepeatTrackerRecords(): Promise<RepeatOffenceRecord[]> {
+  public async getRepeatTrackerRecords(): Promise<RepeatOffenceRecord[]> {
     const cacheKey = 'repeatTrackers';
     const cached = this.getCached<RepeatOffenceRecord[]>(cacheKey);
     if (cached) return cached;

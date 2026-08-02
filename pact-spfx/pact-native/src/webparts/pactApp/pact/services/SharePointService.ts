@@ -1589,7 +1589,7 @@ export class SharePointService {
     }
   }
 
-  private buildDashboardStats(
+  public buildDashboardStats(
     cases: ComplianceCase[],
     escalations: EscalationEntry[],
     trackers: RepeatOffenceRecord[],
@@ -1950,7 +1950,7 @@ export class SharePointService {
     }
   }
 
-  private async getRepeatTrackerRecords(): Promise<RepeatOffenceRecord[]> {
+  public async getRepeatTrackerRecords(): Promise<RepeatOffenceRecord[]> {
     const cacheKey = 'repeatTrackers';
     const cached = this.getCached<RepeatOffenceRecord[]>(cacheKey);
     if (cached) return cached;
