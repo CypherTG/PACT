@@ -93,24 +93,26 @@ export const DashboardPage: React.FC = () => {
       };
     }
 
+    const selectedUpper = selectedCompany.toUpperCase();
+
     const filteredCases = allCases.filter(c => {
       const staff = allStaff.find(s => s.id === c.chargedPerson || s.fullName === c.chargedPersonName || s.email === c.staffEmail);
-      return staff?.company === selectedCompany;
+      return staff?.company?.toUpperCase() === selectedUpper;
     });
 
     const filteredEscalations = allEscalations.filter(e => {
       const staff = allStaff.find(s => s.id === e.offender || s.fullName === e.offenderName);
-      return staff?.company === selectedCompany;
+      return staff?.company?.toUpperCase() === selectedUpper;
     });
 
     const filteredTrackers = allTrackers.filter(t => {
       const staff = allStaff.find(s => s.id === t.offender || s.fullName === t.offenderName);
-      return staff?.company === selectedCompany;
+      return staff?.company?.toUpperCase() === selectedUpper;
     });
 
     const filteredAppeals = allAppeals.filter(a => {
       const staff = allStaff.find(s => s.id === a.appellant || s.fullName === a.appellant);
-      return staff?.company === selectedCompany;
+      return staff?.company?.toUpperCase() === selectedUpper;
     });
 
     return {
@@ -225,8 +227,9 @@ export const DashboardPage: React.FC = () => {
               <option value="All">All Companies</option>
               <option value="KCC">KCC</option>
               <option value="KESL">KESL</option>
-              <option value="Interkonstruct">Interkonstruct</option>
+              <option value="INTERKONSTRUCT">INTERKONSTRUCT</option>
               <option value="PMT7">PMT7</option>
+              <option value="NGNEERED">NGNEERED</option>
             </select>
           </div>
 
