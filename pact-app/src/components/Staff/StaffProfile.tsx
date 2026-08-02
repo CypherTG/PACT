@@ -26,11 +26,20 @@ export const StaffProfile: React.FC = () => {
         const memberRecord = Array.isArray(staffList) ? staffList.find((s: StaffMember) => s.id === id || s.fullName === id) || null : null;
         return memberRecord;
       }),
-      sharePointService.getCases().then(list => (Array.isArray(list) ? list.filter((c: ComplianceCase) => 
-        c.chargedPerson === id || 
-        c.chargedPersonName === id ||
-        (c.chargedPersonName && id && c.chargedPersonName.toLowerCase() === id.toLowerCase())
-      ) : [])),
+      sharePointService.getCases().then(list => {
+        if (!Array.isArray(list)) return [];
+        const normalizedId = (id || '').toLowerCase().trim();
+        return list.filter((c: ComplianceCase) => {
+          const candidateValues = [
+            c.chargedPerson,
+            c.chargedPersonName,
+            (c as any).chargedPersonEmail,
+            c.staffEmail,
+            c.title
+          ].filter(Boolean).map(value => String(value).toLowerCase().trim());
+          return candidateValues.includes(normalizedId);
+        });
+      }),
       sharePointService.getDisciplinaryActions().then(list => (Array.isArray(list) ? list : [])),
       sharePointService.getRepeatTrackerRecord(id || '')
     ]).then(([m, c, a, t]) => {
@@ -176,7 +185,7 @@ export const StaffProfile: React.FC = () => {
                         <div className="activity-title" style={{fontSize: '1.05rem'}}>{c.offenceCategoryName}</div>
                         <span className={`status-badge status-${c.status.toLowerCase()}`}>{c.status}</span>
                       </div>
-                      <div className="activity-desc" style={{margin: '0.5rem 0'}}>{c.offenceDescription}</div>
+                      <div className="activity-desc" style={{margin: '0.5rem 0'}}>{c.offenceDescription || (c as any).description || 'Breach description not available.'}</div>
                       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem'}}>
                         <div className="activity-time">{new Date(c.dateCreated).toLocaleDateString()}</div>
                         <NavLink to={`/cases/${c.id}`} className="link-action" style={{fontSize: '0.85rem'}}>View Case File</NavLink>

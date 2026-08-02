@@ -22,6 +22,24 @@ export class SharePointService {
   private _spfxContext: any = null;
   private _caseMappingLogged = false;
   private _escalationDiagLogged = false;
+  private _cache: Record<string, { data: any; timestamp: number }> = {};
+  private readonly CACHE_TTL_MS = 8000; // 8 seconds cache
+
+  private getCached<T>(key: string): T | null {
+    const entry = this._cache[key];
+    if (entry && Date.now() - entry.timestamp < this.CACHE_TTL_MS) {
+      return entry.data as T;
+    }
+    return null;
+  }
+
+  private setCached(key: string, data: any): void {
+    this._cache[key] = { data, timestamp: Date.now() };
+  }
+
+  public clearCache(): void {
+    this._cache = {};
+  }
 
   // Called by the SPFx WebPart to inject context before React renders
   public static init(context: any): void {
@@ -94,6 +112,85 @@ export class SharePointService {
       .replace(/\bS2\b/g, 'Suspension (2 Days)')
       .replace(/\bS4\b/g, 'Suspension (4 Days)')
       .replace(/\bT&P\b/g, 'Termination & Prosecution');
+  }
+
+  private normalizeText(value: any): string {
+    return String(value ?? '').toLowerCase().trim();
+  }
+
+  private getCaseTotalDue(caseRecord: Partial<ComplianceCase>): number {
+    const penalty = this.parsePenalty(caseRecord.penaltyAmount);
+    const fee = this.parsePenalty((caseRecord as any).escalationFeeAmount);
+    return penalty + fee;
+  }
+
+  private getResponsePortalBaseUrl(): string {
+    return RESPONSE_PORTAL_BASE_URL.length > 0
+      ? RESPONSE_PORTAL_BASE_URL.replace(/\/$/, '')
+      : `${window.location.origin}${window.location.pathname}`.replace(/[#?].*$/, '');
+  }
+
+  private async persistCaseFields(caseId: string, updates: Partial<ComplianceCase> & Record<string, any>): Promise<void> {
+    if (this.isLocal) {
+      const cases = this.getFromLocal<ComplianceCase>('pact_cases');
+      const idx = cases.findIndex(c => c.id === caseId);
+      if (idx > -1) {
+        cases[idx] = { ...cases[idx], ...updates };
+        this.saveToLocal('pact_cases', cases);
+      }
+      return;
+    }
+
+    const itemType = await this.getListItemEntityType(LIST_NAMES.COMPLIANCE_CASES);
+    const spData: any = { '__metadata': { 'type': itemType } };
+    const fieldMap: Record<string, string> = {
+      status: 'Status',
+      dueDate: COLUMNS.CASES.DUE_DATE,
+      noticeSentAt: 'NoticeSentAt',
+      totalAmountDue: 'TotalAmountDue',
+      escalationApplied: 'EscalationApplied',
+      escalationAppliedAt: 'EscalationAppliedAt',
+      escalationFeeAmount: 'EscalationFeeAmount',
+      penaltyAmount: COLUMNS.CASES.PENALTY_AMOUNT
+    };
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      const field = fieldMap[key] || key;
+      spData[field] = value;
+    }
+
+    const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.COMPLIANCE_CASES, spData);
+    await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items(${caseId})`, {
+      method: 'POST',
+      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+      body: JSON.stringify(filteredData)
+    });
+  }
+
+  private getCaseNoticeDate(caseRecord: Partial<ComplianceCase>): string {
+    return (caseRecord as any).noticeSentAt || caseRecord.dueDate || caseRecord.dateCreated || new Date().toISOString();
+  }
+
+  private async applyRefusalToPayEscalations(cases: ComplianceCase[]): Promise<void> {
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    for (const caseRecord of cases) {
+      const status = this.normalizeText(caseRecord.status);
+      if ((caseRecord as any).escalationApplied || status !== this.normalizeText(CASE_STATUS.UNPAID)) continue;
+
+      const noticeDate = new Date(this.getCaseNoticeDate(caseRecord)).getTime();
+      if (!Number.isFinite(noticeDate) || now - noticeDate < sevenDaysMs) continue;
+
+      const escalationFeeAmount = this.parsePenalty(caseRecord.penaltyAmount);
+      await this.persistCaseFields(caseRecord.id, {
+        escalationApplied: true,
+        escalationAppliedAt: new Date().toISOString(),
+        escalationFeeAmount,
+        totalAmountDue: caseRecord.penaltyAmount + escalationFeeAmount
+      });
+    }
   }
 
   /**
@@ -512,6 +609,7 @@ export class SharePointService {
   }
 
   private notifyDataChanged(): void {
+    this.clearCache();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('pact-data-changed'));
     }
@@ -666,34 +764,43 @@ export class SharePointService {
     proofFile: File,
     paymentNotes?: string
   ): Promise<{ proofUrl: string }> {
-    const proofUrl = await this.uploadPaymentProofFile(caseData.title, proofFile);
-
-    let caseItemId: number | undefined;
-    if (!this.isLocal) {
-      caseItemId = caseData.id !== 'fallback' ? Number(caseData.id) : undefined;
-      // Treat mock timestamp IDs as invalid/undefined so we fall back to title search
-      if (caseItemId && caseItemId > 10000000) {
-        caseItemId = undefined;
-      }
-      if (!Number.isFinite(caseItemId)) {
-        const resolved = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseData.title);
-        if (resolved) caseItemId = resolved;
-      }
-      if (Number.isFinite(caseItemId)) {
-        const proofLinkValue = `${proofUrl}, Payment proof`;
-        const proofFieldDisplayNames = ['Evidence', 'Payment Proof', 'Payment Proof URL', 'Proof of Payment'];
-        for (const fieldName of proofFieldDisplayNames) {
-          const saved = await this.tryUpdateListItemByDisplayNames(
-            LIST_NAMES.COMPLIANCE_CASES,
-            caseItemId!,
-            [{ FieldName: fieldName, FieldValue: proofLinkValue }]
-          );
-          if (saved) break;
-        }
-      }
+    let proofUrl = 'https://default-proof-url.placeholder';
+    try {
+      proofUrl = await this.uploadPaymentProofFile(caseData.title, proofFile);
+    } catch (err) {
+      console.warn("[PACT] Failed to upload proof file to SharePoint (likely external user), using offline reference:", err);
+      proofUrl = `Offline proof attached for case ${caseData.title}`;
     }
 
-    await this.updateCaseStatusForReference(caseData.title, CASE_STATUS.PAID, caseItemId);
+    let caseItemId: number | undefined;
+    try {
+      if (!this.isLocal) {
+        caseItemId = caseData.id !== 'fallback' ? Number(caseData.id) : undefined;
+        // Treat mock timestamp IDs as invalid/undefined so we fall back to title search
+        if (caseItemId && caseItemId > 10000000) {
+          caseItemId = undefined;
+        }
+        if (!Number.isFinite(caseItemId)) {
+          const resolved = await this.findListItemIdByTitle(LIST_NAMES.COMPLIANCE_CASES, caseData.title);
+          if (resolved) caseItemId = resolved;
+        }
+        if (Number.isFinite(caseItemId)) {
+          const proofLinkValue = `${proofUrl}, Payment proof`;
+          const proofFieldDisplayNames = ['Evidence', 'Payment Proof', 'Payment Proof URL', 'Proof of Payment'];
+          for (const fieldName of proofFieldDisplayNames) {
+            const saved = await this.tryUpdateListItemByDisplayNames(
+              LIST_NAMES.COMPLIANCE_CASES,
+              caseItemId!,
+              [{ FieldName: fieldName, FieldValue: proofLinkValue }]
+            );
+            if (saved) break;
+          }
+        }
+      }
+      await this.updateCaseStatusForReference(caseData.title, CASE_STATUS.PAID, caseItemId);
+    } catch (err) {
+      console.warn("[PACT] Failed to update case status in SharePoint (likely external user), proceeding with email notification:", err);
+    }
 
     const hrSubject = `PACT: Payment received — ${caseData.title}`;
     const hrBody = `
@@ -728,6 +835,7 @@ export class SharePointService {
     const extraRows = [
       appeal.department ? `<tr><td style="padding:6px 0;color:#666;">Department</td><td>${appeal.department}</td></tr>` : '',
       appeal.offence ? `<tr><td style="padding:6px 0;color:#666;">Offence</td><td>${appeal.offence}</td></tr>` : '',
+      appeal.offenceDescription ? `<tr><td style="padding:6px 0;color:#666;">Breach Description</td><td>${appeal.offenceDescription}</td></tr>` : '',
       typeof appeal.penaltyAmount === 'number'
         ? `<tr><td style="padding:6px 0;color:#666;">Penalty</td><td>₦${appeal.penaltyAmount.toLocaleString()}</td></tr>`
         : '',
@@ -899,14 +1007,20 @@ export class SharePointService {
 
   // --- Cases ---
   public async getCases(): Promise<ComplianceCase[]> {
+    const cacheKey = 'cases';
+    const cached = this.getCached<ComplianceCase[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       if (this.isLocal) {
         const localCases = this.getFromLocal<ComplianceCase>('pact_cases');
-        return localCases.map(c => ({
+        const res = localCases.map(c => ({
           ...c,
           offenceCategoryName: this.expandAbbreviations(c.offenceCategoryName || ''),
           penaltyAmount: this.parsePenalty(c.penaltyAmount)
         })).sort((a,b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
+        this.setCached(cacheKey, res);
+        return res;
       }
 
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.COMPLIANCE_CASES}')/items?$select=*,FieldValuesAsText/*&$expand=FieldValuesAsText&$orderby=Created desc`;
@@ -915,10 +1029,15 @@ export class SharePointService {
         this.getStaffDirectory(),
         this.getPolicyLibrary()
       ]);
-      return data.results.map((item: any) => this.mapSPItemToCase(item, staff, policies));
+      const mapped = data.results.map((item: any) => this.mapSPItemToCase(item, staff, policies));
+      this.setCached(cacheKey, mapped);
+      void this.applyRefusalToPayEscalations(mapped);
+      return mapped;
     } catch (error) {
       console.warn("REST/Graph fetch failed, falling back to local mocks", error);
-      return this.getFromLocal<ComplianceCase>('pact_cases');
+      const res = this.getFromLocal<ComplianceCase>('pact_cases');
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
@@ -944,7 +1063,9 @@ export class SharePointService {
         this.getStaffDirectory(),
         this.getPolicyLibrary()
       ]);
-      return this.mapSPItemToCase(item, staff, policies);
+      const mappedCase = this.mapSPItemToCase(item, staff, policies);
+      void this.applyRefusalToPayEscalations([mappedCase]);
+      return mappedCase;
     } catch (error) {
       console.warn(`[PACT] getCaseByReference OData query failed for "${ref}", falling back to full cases list:`, error);
       const cases = await this.getCases();
@@ -954,12 +1075,18 @@ export class SharePointService {
 
 
   public async getStaffDirectory(): Promise<StaffMember[]> {
+    const cacheKey = 'staffDirectory';
+    const cached = this.getCached<StaffMember[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       if (this.isLocal) {
-        return (staffData as StaffMember[]).map(item => ({
+        const res = (staffData as StaffMember[]).map(item => ({
           ...item,
           photoUrl: this.getPhotoUrl(item.email)
         }));
+        this.setCached(cacheKey, res);
+        return res;
       }
 
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.STAFF_DIRECTORY}')/items?$top=5000`;
@@ -969,7 +1096,7 @@ export class SharePointService {
       this.diagnoseListColumns(LIST_NAMES.STAFF_DIRECTORY);
 
       if (data && data.results && data.results.length > 0) {
-        return data.results.map((item: any) => {
+        const res = data.results.map((item: any) => {
           const email = item[COLUMNS.STAFF.EMAIL] || item.EmailAddress || item.Email || item.email || '';
           const lineManager = item[COLUMNS.STAFF.LINE_MANAGER] || item.LineManager || item.Line_x0020_Manager || item.lineManager || '';
           return {
@@ -985,32 +1112,44 @@ export class SharePointService {
             photoUrl: email ? this.getPhotoUrl(email) : undefined
           };
         });
+        this.setCached(cacheKey, res);
+        return res;
       }
       
-      return (staffData as StaffMember[]).map(item => ({
+      const res = (staffData as StaffMember[]).map(item => ({
         ...item,
         photoUrl: this.getPhotoUrl(item.email)
       }));
+      this.setCached(cacheKey, res);
+      return res;
     } catch (error) {
       console.warn("Failed to fetch staff from SharePoint list, falling back to local JSON", error);
-      return (staffData as StaffMember[]).map(item => ({
+      const res = (staffData as StaffMember[]).map(item => ({
         ...item,
         photoUrl: this.getPhotoUrl(item.email)
       }));
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
 
   // --- Policies ---
   public async getPolicyLibrary(): Promise<PolicyOffence[]> {
+    const cacheKey = 'policyLibrary';
+    const cached = this.getCached<PolicyOffence[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       if (this.isLocal) {
-        return policyData as PolicyOffence[];
+        const res = policyData as PolicyOffence[];
+        this.setCached(cacheKey, res);
+        return res;
       }
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.POLICY_LIBRARY}')/items?$top=500`;
       const data = await this.fetchREST(endpoint);
       if (data && data.results && data.results.length > 0) {
-        return data.results
+        const res = data.results
           .filter((item: any) => item.Title && item.Title.trim() !== '')
           .map((item: any) => {
           const liveTitle = item.Title || '';
@@ -1031,11 +1170,17 @@ export class SharePointService {
             escalationTrigger: localMatch?.escalationTrigger ?? true
           };
         });
+        this.setCached(cacheKey, res);
+        return res;
       }
-      return policyData as PolicyOffence[];
+      const res = policyData as PolicyOffence[];
+      this.setCached(cacheKey, res);
+      return res;
     } catch (error) {
       console.warn("Failed to fetch policy library from SharePoint, falling back to local JSON", error);
-      return policyData as PolicyOffence[];
+      const res = policyData as PolicyOffence[];
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
@@ -1256,7 +1401,7 @@ export class SharePointService {
           [COLUMNS.CASES.DEPARTMENT]: newCase.department,
           [COLUMNS.CASES.OFFENCE_CATEGORY]: newCase.offenceCategoryName,
           'offenceName': newCase.offenceCategoryName, // Flow Alias
-          'OffenceDescription': newCase.offenceDescription,
+          [COLUMNS.CASES.OFFENCE_DESCRIPTION]: newCase.offenceDescription,
           'Offence_x0020_Description': newCase.offenceDescription,
           [COLUMNS.CASES.PENALTY_AMOUNT]: newCase.penaltyAmount,
           [COLUMNS.CASES.DUE_DATE]: newCase.dueDate,
@@ -1552,6 +1697,10 @@ export class SharePointService {
   }
 
   public async getEscalationLog(): Promise<EscalationEntry[]> {
+    const cacheKey = 'escalationLog';
+    const cached = this.getCached<EscalationEntry[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       if (!this.isLocal) {
         // Request FieldValuesAsText so we get text representations of ALL fields (including lookups)
@@ -1599,7 +1748,7 @@ export class SharePointService {
           return '';
         };
 
-        return items.map((item: any) => {
+        const res = items.map((item: any) => {
           const caseRef = readEsc(item,
             COLUMNS.ESCALATION.CASE_REFERENCE, 'CaseReference', 'Case_x0020_Reference',
             'Case Reference', 'CaseRef', 'Case Ref'
@@ -1676,11 +1825,17 @@ export class SharePointService {
             ) || ''
           };
         });
+        this.setCached(cacheKey, res);
+        return res;
       }
-      return this.getFromLocal<EscalationEntry>('pact_escalations');
+      const res = this.getFromLocal<EscalationEntry>('pact_escalations');
+      this.setCached(cacheKey, res);
+      return res;
     } catch (err) {
       console.warn('[PACT] getEscalationLog failed, falling back to local:', err);
-      return this.getFromLocal<EscalationEntry>('pact_escalations');
+      const res = this.getFromLocal<EscalationEntry>('pact_escalations');
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
@@ -1796,14 +1951,20 @@ export class SharePointService {
   }
 
   private async getRepeatTrackerRecords(): Promise<RepeatOffenceRecord[]> {
+    const cacheKey = 'repeatTrackers';
+    const cached = this.getCached<RepeatOffenceRecord[]>(cacheKey);
+    if (cached) return cached;
+
     if (this.isLocal) {
-      return this.getFromLocal<RepeatOffenceRecord>('pact_trackers');
+      const res = this.getFromLocal<RepeatOffenceRecord>('pact_trackers');
+      this.setCached(cacheKey, res);
+      return res;
     }
 
     try {
       const endpoint = `web/lists/getbytitle('${LIST_NAMES.REPEAT_OFFENCE_TRACKER}')/items?$orderby=ID desc`;
       const data = await this.fetchREST(endpoint);
-      return (data.results || []).map((item: any) => ({
+      const res = (data.results || []).map((item: any) => ({
         id: item.ID.toString(),
         title: this.readField(item, COLUMNS.REPEAT_TRACKER.TITLE, 'Title'),
         offender: (() => {
@@ -1826,9 +1987,13 @@ export class SharePointService {
         lastOffenceDate: this.readField(item, COLUMNS.REPEAT_TRACKER.LAST_OFFENCE_DATE, 'LastOffenceDate', 'Last Offence Date') || new Date().toISOString(),
         escalationDue: this.readField(item, COLUMNS.REPEAT_TRACKER.ESCALATION_DUE, 'EscalationDue', 'Escalation Due') === true || this.readField(item, COLUMNS.REPEAT_TRACKER.ESCALATION_DUE, 'EscalationDue', 'Escalation Due') === 'True'
       }));
+      this.setCached(cacheKey, res);
+      return res;
     } catch (error) {
       console.warn('Failed to load live repeat tracker records', error);
-      return this.getFromLocal<RepeatOffenceRecord>('pact_trackers');
+      const res = this.getFromLocal<RepeatOffenceRecord>('pact_trackers');
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
@@ -2088,11 +2253,15 @@ export class SharePointService {
   // --- Appeals ---
 
   public async getAppeals(): Promise<any[]> {
+    const cacheKey = 'appeals';
+    const cached = this.getCached<any[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       if (!this.isLocal) {
         const endpoint = `web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items?$orderby=ID desc`;
         const data = await this.fetchREST(endpoint);
-        return (data.results || []).map((item: any) => ({
+        const res = (data.results || []).map((item: any) => ({
           id: item.ID.toString(),
           title: this.readField(item, COLUMNS.APPEALS.TITLE, 'Title', 'Appeal ID'),
           caseReference: this.readField(item, COLUMNS.APPEALS.CASE_REFERENCE, 'Case Reference', 'CaseReference', 'Case_x0020_Reference'),
@@ -2104,10 +2273,16 @@ export class SharePointService {
           decisionDate: this.readField(item, COLUMNS.APPEALS.DECISION_DATE, 'Decision Date', 'DecisionDate', 'Decision_x0020_Date'),
           decisionNotes: this.readField(item, COLUMNS.APPEALS.DECISION_NOTES, 'Decision Notes', 'DecisionNotes', 'Decision_x0020_Notes')
         }));
+        this.setCached(cacheKey, res);
+        return res;
       }
-      return this.getFromLocal<any>('pact_appeals');
+      const res = this.getFromLocal<any>('pact_appeals');
+      this.setCached(cacheKey, res);
+      return res;
     } catch {
-      return this.getFromLocal<any>('pact_appeals');
+      const res = this.getFromLocal<any>('pact_appeals');
+      this.setCached(cacheKey, res);
+      return res;
     }
   }
 
@@ -2144,7 +2319,12 @@ export class SharePointService {
     const appealDate = new Date().toISOString();
 
     // Resolve original case details by reference to fully populate all appeal fields
-    const originalCase = await this.getCaseByReference(appeal.caseReference);
+    let originalCase: any = null;
+    try {
+      originalCase = await this.getCaseByReference(appeal.caseReference);
+    } catch (err) {
+      console.warn("[PACT] Failed to resolve original case by reference from SharePoint (likely external user):", err);
+    }
 
     const enrichedAppeal = {
       ...appeal,
@@ -2167,25 +2347,33 @@ export class SharePointService {
       });
       this.saveToLocal('pact_appeals', log);
     } else {
-      const spData = {
-        '__metadata': { 'type': `SP.Data.${LIST_NAMES.APPEALS_REGISTER.replace(/ /g, '_x0020_')}ListItem` },
-        [COLUMNS.APPEALS.TITLE]: title,
-        [COLUMNS.APPEALS.CASE_REFERENCE]: enrichedAppeal.caseReference,
-        [COLUMNS.APPEALS.APPELLANT]: enrichedAppeal.appellant,
-        [COLUMNS.APPEALS.APPEAL_DATE]: appealDate,
-        [COLUMNS.APPEALS.GROUNDS]: enrichedAppeal.grounds,
-        [COLUMNS.APPEALS.DECISION]: 'Pending'
-      };
+      try {
+        const spData = {
+          '__metadata': { 'type': `SP.Data.${LIST_NAMES.APPEALS_REGISTER.replace(/ /g, '_x0020_')}ListItem` },
+          [COLUMNS.APPEALS.TITLE]: title,
+          [COLUMNS.APPEALS.CASE_REFERENCE]: enrichedAppeal.caseReference,
+          [COLUMNS.APPEALS.APPELLANT]: enrichedAppeal.appellant,
+          [COLUMNS.APPEALS.APPEAL_DATE]: appealDate,
+          [COLUMNS.APPEALS.GROUNDS]: enrichedAppeal.grounds,
+          [COLUMNS.APPEALS.DECISION]: 'Pending'
+        };
 
-      const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.APPEALS_REGISTER, spData);
-      await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
-        method: 'POST',
-        body: JSON.stringify(filteredData)
-      });
+        const filteredData = await this.filterPayloadToAvailableFields(LIST_NAMES.APPEALS_REGISTER, spData);
+        await this.fetchREST(`web/lists/getbytitle('${LIST_NAMES.APPEALS_REGISTER}')/items`, {
+          method: 'POST',
+          body: JSON.stringify(filteredData)
+        });
+      } catch (err) {
+        console.warn("[PACT] Failed to write appeal to SharePoint Appeals Register (likely external user):", err);
+      }
     }
 
     // ── Apply side effects (Both Modes) ──
-    await this.updateCaseStatusForReference(enrichedAppeal.caseReference, CASE_STATUS.APPEAL_PENDING);
+    try {
+      await this.updateCaseStatusForReference(enrichedAppeal.caseReference, CASE_STATUS.APPEAL_PENDING);
+    } catch (err) {
+      console.warn("[PACT] Failed to update case status in SharePoint (likely external user):", err);
+    }
     this.notifyDataChanged();
 
     // ── Send Email Notifications ──
@@ -2497,7 +2685,7 @@ export class SharePointService {
 
     const titleField = this.readField(item, COLUMNS.CASES.TITLE, 'Penalty ID', 'Case ID', 'CaseID', 'Title') || '';
     const isHistoricalItem = titleField.startsWith('HIST-');
-    const rawDescription = this.readField(item, 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description') || '';
+    const rawDescription = this.readField(item, COLUMNS.CASES.OFFENCE_DESCRIPTION, 'BreachDescription', 'Breach Description', 'Breach_x0020_Description', 'OffenceDescription', 'Offence Description', 'Offence_x0020_Description', 'Description', 'offenceDescription') || '';
 
     return {
       id: String(item.ID || item.Id || ''),

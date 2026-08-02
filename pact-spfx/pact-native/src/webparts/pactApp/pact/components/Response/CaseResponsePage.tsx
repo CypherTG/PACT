@@ -85,8 +85,8 @@ export const CaseResponsePage: React.FC = () => {
         setCaseData(enrichCaseFromLink(found));
         setLoading(false);
       } catch (err) {
-        console.error('Failed to load case:', err);
-        setError('Unable to load case details. Please try again later.');
+        console.warn('Failed to load case from SharePoint, falling back to URL parameters:', err);
+        setCaseData(buildFallbackCase(caseId));
         setLoading(false);
       }
     };

@@ -5,19 +5,14 @@ const path = require('node:path');
 const gulp = require('gulp');
 
 const projectRoot = __dirname;
-const heftBin = process.platform === 'win32'
-  ? path.join(projectRoot, 'node_modules', '.bin', 'heft.cmd')
-  : path.join(projectRoot, 'node_modules', '.bin', 'heft');
+const heftBin = path.join(projectRoot, 'node_modules', '@rushstack', 'heft', 'bin', 'heft');
 
 function runHeft(args) {
   return (done) => {
-    // On Windows, .cmd files need shell:true. Wrap bin path in quotes to handle spaces.
-    const quotedBin = process.platform === 'win32' ? `"${heftBin}"` : heftBin;
-    const child = spawn(quotedBin, args, {
+    const child = spawn(process.execPath, [heftBin, ...args], {
       cwd: projectRoot,
       stdio: 'inherit',
-      shell: true,
-      windowsVerbatimArguments: false
+      shell: false
     });
 
     child.on('error', done);

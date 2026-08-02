@@ -83,6 +83,7 @@ export const COLUMNS = {
     STATUS: 'Status',
     TIER: 'Tier',
     DISCIPLINARY_ACTION: 'DisciplinaryAction',
+    OFFENCE_DESCRIPTION: 'BreachDescription',
     OFFENCE_COUNT: 'OffenceCount',
     ACTION_LABEL: 'ActionLabel',
     /** Optional on site — use display-name update if column exists */
@@ -165,7 +166,7 @@ export const COLUMNS = {
 export const CASE_STATUS_OPTIONS = ['Unpaid', 'Paid', 'Overdue', 'Waived', 'Appeal Pending', 'Acknowledged'] as const;
 export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'] as const;
 export const CATEGORIES = ['Conduct', 'Project Integrity', 'Strategic', 'EHSQ'] as const;
-export const COMPANIES = ['KCC', 'KESL', 'Interkonstruct'] as const;
+export const COMPANIES = ['KCC', 'KESL', 'Interkonstruct', 'PMT7'] as const;
 export const EMPLOYEE_TYPES = ['Employee', 'Consultant', 'Contractor'] as const;
 export const STAFF_STATUS = ['Active', 'Inactive'] as const;
 export const ACTION_TYPES = ['Warning', 'Fine', 'Suspension', 'Termination'] as const;

@@ -32,7 +32,7 @@ export interface StaffMember {
   department: string;
   role: string;
   lineManager: string;
-  company: 'KCC' | 'KESL' | 'Interkonstruct';
+  company: 'KCC' | 'KESL' | 'Interkonstruct' | 'PMT7';
   employeeType: 'Employee' | 'Consultant' | 'Contractor';
   status: 'Active' | 'Inactive';
   photoUrl?: string;
