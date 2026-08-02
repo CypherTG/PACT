@@ -95,24 +95,29 @@ export const DashboardPage: React.FC = () => {
 
     const selectedUpper = selectedCompany.toUpperCase();
 
+    const getStaffCompanyUpper = (s: StaffMember) => {
+      const co = s.company?.toUpperCase();
+      return co === 'KESL' ? 'PMT7' : co;
+    };
+
     const filteredCases = allCases.filter(c => {
       const staff = allStaff.find(s => s.id === c.chargedPerson || s.fullName === c.chargedPersonName || s.email === c.staffEmail);
-      return staff?.company?.toUpperCase() === selectedUpper;
+      return staff ? getStaffCompanyUpper(staff) === selectedUpper : false;
     });
 
     const filteredEscalations = allEscalations.filter(e => {
       const staff = allStaff.find(s => s.id === e.offender || s.fullName === e.offenderName);
-      return staff?.company?.toUpperCase() === selectedUpper;
+      return staff ? getStaffCompanyUpper(staff) === selectedUpper : false;
     });
 
     const filteredTrackers = allTrackers.filter(t => {
       const staff = allStaff.find(s => s.id === t.offender || s.fullName === t.offenderName);
-      return staff?.company?.toUpperCase() === selectedUpper;
+      return staff ? getStaffCompanyUpper(staff) === selectedUpper : false;
     });
 
     const filteredAppeals = allAppeals.filter(a => {
       const staff = allStaff.find(s => s.id === a.appellant || s.fullName === a.appellant);
-      return staff?.company?.toUpperCase() === selectedUpper;
+      return staff ? getStaffCompanyUpper(staff) === selectedUpper : false;
     });
 
     return {
@@ -225,7 +230,6 @@ export const DashboardPage: React.FC = () => {
             >
               <option value="All">All Companies</option>
               <option value="KCC">KCC</option>
-              <option value="KESL">KESL</option>
               <option value="INTERKONSTRUCT">INTERKONSTRUCT</option>
               <option value="PMT7">PMT7</option>
               <option value="NGNEERED">NGNEERED</option>
