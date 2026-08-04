@@ -272,7 +272,7 @@ export const DashboardPage: React.FC = () => {
             <span className="kpi-label">Open Cases</span>
             <span className="kpi-value">{stats.totalActiveCases}</span>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-              {stats.paidCases} paid · {stats.appealPendingCases} in appeal
+              {stats.totalActiveCases - stats.appealPendingCases} unpaid · {stats.appealPendingCases} in appeal
             </span>
           </div>
         </div>

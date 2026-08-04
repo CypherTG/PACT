@@ -1622,7 +1622,7 @@ export class SharePointService {
       });
     }
 
-    const unpaidStatuses = new Set([CASE_STATUS.UNPAID, CASE_STATUS.OVERDUE, 'Acknowledged']);
+    const unpaidStatuses = new Set([CASE_STATUS.UNPAID, CASE_STATUS.OVERDUE, 'Acknowledged', CASE_STATUS.APPEAL_PENDING]);
     return {
       totalActiveCases: cases.filter(c => unpaidStatuses.has(c.status)).length,
       paidCases: cases.filter(c => c.status === CASE_STATUS.PAID).length,
