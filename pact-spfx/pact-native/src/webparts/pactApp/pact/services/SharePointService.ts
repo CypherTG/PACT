@@ -1620,6 +1620,15 @@ export class SharePointService {
     }
 
     const unpaidStatuses = new Set([CASE_STATUS.UNPAID, CASE_STATUS.OVERDUE, 'Acknowledged', CASE_STATUS.APPEAL_PENDING]);
+    const personOffenceCounts: Record<string, number> = {};
+    cases.forEach(c => {
+      const key = c.chargedPerson || c.chargedPersonName;
+      if (key) {
+        personOffenceCounts[key] = (personOffenceCounts[key] || 0) + 1;
+      }
+    });
+    const repeatOffCount = Object.values(personOffenceCounts).filter(count => count > 1).length;
+
     return {
       totalActiveCases: cases.filter(c => unpaidStatuses.has(c.status)).length,
       paidCases: cases.filter(c => c.status === CASE_STATUS.PAID).length,
@@ -1632,7 +1641,7 @@ export class SharePointService {
         const decision = String(appeal?.decision || '').toLowerCase();
         return !decision || decision === 'pending';
       }).length,
-      repeatOffenders: trackers.filter(t => t.totalOffences > 1).length,
+      repeatOffenders: repeatOffCount,
       totalFines: cases.reduce((sum, c) => sum + c.penaltyAmount, 0),
       casesByTier,
       casesByMonth: last6Months,

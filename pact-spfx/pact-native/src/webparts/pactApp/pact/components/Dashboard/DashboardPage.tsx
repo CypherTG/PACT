@@ -66,10 +66,14 @@ export const DashboardPage: React.FC = () => {
         sharePointService.getMailHistory()
       ]);
 
-      setAllCases(cases);
-      setAllEscalations(escalations);
+      const activeCases = cases.filter(c => !c.title?.toUpperCase().startsWith('HIST-'));
+      const activeEscalations = escalations.filter(e => !e.caseReference?.toUpperCase().startsWith('HIST-'));
+      const activeAppeals = appeals.filter(a => !a.caseReference?.toUpperCase().startsWith('HIST-'));
+
+      setAllCases(activeCases);
+      setAllEscalations(activeEscalations);
       setAllTrackers(trackers);
-      setAllAppeals(appeals);
+      setAllAppeals(activeAppeals);
       setAllStaff(staff);
 
       if (Array.isArray(history)) {
