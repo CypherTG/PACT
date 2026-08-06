@@ -2649,7 +2649,11 @@ export class SharePointService {
       secondaryContact: this.readField(item, COLUMNS.CASES.SECONDARY_CONTACT, 'SecondaryContact', 'Secondary Contact Email'),
       status: this.readField(item, COLUMNS.CASES.STATUS, 'Status'),
       dateCreated: this.readField(item, 'Created', 'Date Created', 'Date Created ') || new Date().toISOString(),
-      tier: this.readField(item, COLUMNS.CASES.TIER, 'Tier') || policy?.tier || 'Tier 1'
+      tier: this.readField(item, COLUMNS.CASES.TIER, 'Tier') || policy?.tier || 'Tier 1',
+      escalationApplied: this.readField(item, 'EscalationApplied') === true || this.readField(item, 'EscalationApplied') === 'Yes' || this.readField(item, 'EscalationApplied') === 'true',
+      escalationAppliedAt: this.readField(item, 'EscalationAppliedAt'),
+      escalationFeeAmount: this.parsePenalty(this.readField(item, 'EscalationFeeAmount')),
+      totalAmountDue: this.parsePenalty(this.readField(item, 'TotalAmountDue'))
     };
   }
 

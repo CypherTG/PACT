@@ -28,6 +28,10 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
   const isOverdue = daysRemaining < 0;
   const alreadyPaid = caseData.status === 'Paid';
 
+  const hasLateFee = !!caseData.escalationApplied;
+  const lateFeeAmount = caseData.escalationFeeAmount || 0;
+  const totalDue = hasLateFee ? (caseData.totalAmountDue || (caseData.penaltyAmount + lateFeeAmount)) : caseData.penaltyAmount;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!proofFile) {
@@ -79,8 +83,17 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
         <div className="response-card-body">
           {/* Penalty Amount Banner */}
           <div className="penalty-banner">
-            <div className="penalty-label">Total Penalty Amount</div>
-            <div className="penalty-amount">₦{caseData.penaltyAmount.toLocaleString()}</div>
+            <div className="penalty-label">
+              {hasLateFee ? 'Total Amount Due (Overdue + Late Fee)' : 'Total Penalty Amount'}
+            </div>
+            <div className="penalty-amount" style={hasLateFee ? { color: '#ff4d4d' } : {}}>
+              ₦{totalDue.toLocaleString()}
+            </div>
+            {hasLateFee && (
+              <div style={{ fontSize: '0.8rem', color: '#ff8080', fontWeight: 600, marginTop: -4, marginBottom: 8 }}>
+                Includes ₦{lateFeeAmount.toLocaleString()} late payment escalation fee
+              </div>
+            )}
             <div className="penalty-deadline">
               <Clock size={16} style={{ marginRight: 6 }} />
               {isOverdue 
@@ -155,7 +168,7 @@ export const PaymentDetailsPage: React.FC<Props> = ({ caseData }) => {
             <div className="bank-details-row">
               <span className="bd-label">Amount</span>
               <span className="bd-value" style={{ color: '#e94560', fontWeight: 700 }}>
-                ₦{caseData.penaltyAmount.toLocaleString()}
+                ₦{totalDue.toLocaleString()}
               </span>
             </div>
           </div>

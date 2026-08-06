@@ -22,6 +22,10 @@ export interface ComplianceCase {
   dateCreated: string;
   evidence?: string;
   tier?: 'Tier 1' | 'Tier 2' | 'Tier 3';
+  escalationApplied?: boolean;
+  escalationAppliedAt?: string;
+  escalationFeeAmount?: number;
+  totalAmountDue?: number;
 }
 
 // ─── List 02: Staff Directory ───────────────────────────────────────────────

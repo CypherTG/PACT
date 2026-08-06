@@ -42,6 +42,10 @@ export const CaseDetail: React.FC = () => {
   if (loading) return <div className="glass-panel" style={{padding: '40px', textAlign: 'center'}}>Loading case details...</div>;
   if (!caseData) return <div className="glass-panel" style={{padding: '40px', textAlign: 'center'}}>Case not found.</div>;
 
+  const hasLateFee = !!caseData.escalationApplied;
+  const lateFeeAmount = caseData.escalationFeeAmount || 0;
+  const totalDue = hasLateFee ? (caseData.totalAmountDue || (caseData.penaltyAmount + lateFeeAmount)) : caseData.penaltyAmount;
+
   const getSafeDate = (d: string) => {
     if (!d) return 'Just now';
     const parsed = new Date(d);
@@ -105,8 +109,17 @@ export const CaseDetail: React.FC = () => {
             </div>
 
           <div style={{ textAlign: 'right' }}>
-            <p className="text-secondary" style={{ margin: '0 0 4px', fontSize: '0.85rem', textTransform: 'uppercase' }}>Penalty Amount</p>
-            <h3 style={{ margin: 0, fontSize: '1.8rem', color: 'var(--text-primary)' }}>₦{caseData.penaltyAmount.toLocaleString()}</h3>
+            <p className="text-secondary" style={{ margin: '0 0 4px', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+              {hasLateFee ? 'Total Amount Due' : 'Penalty Amount'}
+            </p>
+            <h3 style={{ margin: 0, fontSize: '1.8rem', color: hasLateFee ? 'var(--status-danger)' : 'var(--text-primary)' }}>
+              ₦{totalDue.toLocaleString()}
+            </h3>
+            {hasLateFee && (
+              <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--status-warning)', fontWeight: 600 }}>
+                Includes ₦{lateFeeAmount.toLocaleString()} late fee
+              </p>
+            )}
             <p className="text-secondary" style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
               Due: <strong style={{color: new Date(caseData.dueDate) < new Date() ? 'var(--status-danger)' : 'var(--text-primary)'}}>{getSafeDate(caseData.dueDate)}</strong>
             </p>
