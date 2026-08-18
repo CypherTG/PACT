@@ -66,15 +66,15 @@ export const LIST_NAMES = {
 export const COLUMNS = {
   CASES: {
     TITLE: 'Title',
-    CHARGED_PERSON: 'ChargedPersaon', 
+    CHARGED_PERSON: 'ChargedPersaon',
     STAFF_EMAIL: 'StaffEmail',
     CHARGED_PERSON_EMAIL: 'ChargedPersonEmail',
     DEPARTMENT: 'Department',
-    OFFENCE_CATEGORY: 'OffenceCategory', 
+    OFFENCE_CATEGORY: 'OffenceCategory',
     PENALTY_AMOUNT: 'PenaltyAmount',
     DUE_DATE: 'DueDate',
     ISSUER_NAME: 'IssuerName',
-    SECONDARY_CONTACT: 'SecondaryContact', 
+    SECONDARY_CONTACT: 'SecondaryContact',
     STATUS: 'Status',
     TIER: 'Tier',
     DISCIPLINARY_ACTION: 'DisciplinaryAction',

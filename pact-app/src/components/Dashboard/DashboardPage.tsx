@@ -237,6 +237,7 @@ export const DashboardPage: React.FC = () => {
               <option value="KCC">KCC</option>
               <option value="INTERKONSTRUCT">INTERKONSTRUCT</option>
               <option value="PMT7">PMT7</option>
+              <option value="LIBCC">LIBCC</option>
               <option value="NGNEERED">NGNEERED</option>
             </select>
           </div>

@@ -6,12 +6,12 @@
 import { readViteEnv } from './env';
 
 // ─── Organisation Email Addresses ───────────────────────────────────────────
-export const HR_EMAIL = 'iamoo@konstructum.com'; // HR Department
-export const ADMIN_EMAIL = 'admin@konstructum.com'; // Admin Department
-export const LEGAL_EMAIL = 'abalogun@konstructum.com'; // Legal Department
-export const COMPLIANCE_EMAIL = 'iamoo@konstructum.com'; // Compliance
+export const HR_EMAIL = 'iamoo@ngneeredprojects.com'; // HR Department
+export const ADMIN_EMAIL = 'admin@Konstructum.com'; // Admin Department
+export const LEGAL_EMAIL = 'abalogun@ngneeredprojects.com'; // Legal Department/Business
+export const COMPLIANCE_EMAIL = 'iamoo@ngneeredprojects.com'; // Compliance
 export const CHAIRMAN_EMAIL = readViteEnv('VITE_CHAIRMAN_EMAIL').trim() || 'aawobokun@konstructum.com'; // Chairman
-export const APPEAL_REVIEW_EMAILS = ['aawobokun@konstructum.com', 'fmaalouly@konstructum.com']; // Executive Appeal Reviewers
+export const APPEAL_REVIEW_EMAILS = ['aawobokun@konstructum.com', 'fmaalouly@ngneeredprojects.com']; // Executive Appeal Reviewers
 export const MAIL_TRIGGER_URL = readViteEnv('VITE_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a2651047ffd44146a15bdcb3d0fc110b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MQClT4tptDeXdC7H3K4gcUmn0g1yb7YxzjJxYhBAtZA'; // HTTP Flow Webhook URL
 export const ACCEPT_PAYMENT_TRIGGER_URL = readViteEnv('VITE_ACCEPT_PAYMENT_TRIGGER_URL').trim() || MAIL_TRIGGER_URL; // Accept/payment HTTP Flow URL
 export const APPEAL_MAIL_TRIGGER_URL = readViteEnv('VITE_APPEAL_MAIL_TRIGGER_URL').trim() || 'https://default37d4778d47da40aca3924a8c93c158.30.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/13674850ca7a4f3d92da2893be5d9ad5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=bcSyAnrS7dq9AQ1Dza6SDmpP0h0ybnqGPqRvPwsTgw0'; // Appeal HTTP Flow Webhook URL
@@ -71,15 +71,15 @@ export const LIST_NAMES = {
 export const COLUMNS = {
   CASES: {
     TITLE: 'Title',
-    CHARGED_PERSON: 'ChargedPerson', 
+    CHARGED_PERSON: 'ChargedPerson',
     STAFF_EMAIL: 'StaffEmail',
     CHARGED_PERSON_EMAIL: 'ChargedPersonEmail',
     DEPARTMENT: 'Department',
-    OFFENCE_CATEGORY: 'OffenceCategory', 
+    OFFENCE_CATEGORY: 'OffenceCategory',
     PENALTY_AMOUNT: 'PenaltyAmount',
     DUE_DATE: 'DueDate',
     ISSUER_NAME: 'IssuerName',
-    SECONDARY_CONTACT: 'SecondaryContact', 
+    SECONDARY_CONTACT: 'SecondaryContact',
     STATUS: 'Status',
     TIER: 'Tier',
     DISCIPLINARY_ACTION: 'DisciplinaryAction',
