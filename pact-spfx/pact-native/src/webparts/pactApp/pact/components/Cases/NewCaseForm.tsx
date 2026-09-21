@@ -232,9 +232,14 @@ export const NewCaseForm: React.FC = () => {
               style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
             >
               <option value="">-- Select Infraction --</option>
-              {policies.map(policy => (
-                <option key={policy.id} value={policy.id}>{policy.offenceName} ({policy.tier})</option>
-              ))}
+              {policies.map((policy, idx) => {
+                const code = policy.infractionCode || `INF-${String(idx + 1).padStart(3, '0')}`;
+                return (
+                  <option key={policy.id} value={policy.id}>
+                    {code}: {policy.offenceName} [{policy.tier}]
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -248,8 +253,17 @@ export const NewCaseForm: React.FC = () => {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Classification</div>
-                  <span className={`status-badge status-${selectedPolicy.tier.toLowerCase().replace(' ', '')}`}>{selectedPolicy.tier}</span>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Penalty & Classification</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                    {selectedPolicy && (
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                        {escalationEngine.calculatePenaltyAmount(selectedPolicy, offenceCount) > 0 
+                          ? `₦${escalationEngine.calculatePenaltyAmount(selectedPolicy, offenceCount).toLocaleString()}` 
+                          : 'Exempt (₦0)'}
+                      </span>
+                    )}
+                    <span className={`status-badge status-${selectedPolicy.tier.toLowerCase().replace(' ', '')}`}>{selectedPolicy.tier}</span>
+                  </div>
                 </div>
               </div>
               

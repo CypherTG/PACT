@@ -274,7 +274,7 @@ export class SharePointService {
 
     try {
       console.log(`[PACT] Initializing SharePoint Service (Mode: ${this.runtimeMode})`);
-      const DATA_VERSION = "6.1"; // Fixed key namespace
+      const DATA_VERSION = "6.2"; // Fixed key namespace
       const currentVersion = localStorage.getItem(this.STORAGE_PREFIX + 'data_version');
 
       if (typeof window !== 'undefined') {
@@ -1142,7 +1142,9 @@ export class SharePointService {
 
     try {
       if (this.isLocal) {
-        const res = policyData as PolicyOffence[];
+        const res = [...(policyData as PolicyOffence[])].sort((a, b) => 
+          (a.offenceName || '').localeCompare(b.offenceName || '', undefined, { sensitivity: 'base' })
+        );
         this.setCached(cacheKey, res);
         return res;
       }
@@ -1152,33 +1154,57 @@ export class SharePointService {
         const res = data.results
           .filter((item: any) => item.Title && item.Title.trim() !== '')
           .map((item: any) => {
-          const liveTitle = item.Title || '';
+          const liveTitle = item.Title || item.OffenceName || item.Offence_x0020_Name || '';
           const localMatch = (policyData as PolicyOffence[]).find(
             p => p.offenceName.toLowerCase().trim() === liveTitle.toLowerCase().trim()
           );
 
+          const firstAction = item.First_x0020_Offence_x0020_Action || item.FirstOffenceAction || item.First_x0020_Action || localMatch?.firstOffenceAction || '';
+          const secondAction = item.Second_x0020_Offence_x0020_Action || item.SecondOffenceAction || item.Second_x0020_Action || localMatch?.secondOffenceAction || '';
+          const thirdAction = item.Third_x0020_Offence_x0020_Action || item.ThirdOffenceAction || item.Third_x0020_Action || localMatch?.thirdOffenceAction || '';
+          const rawPenalty = item.Default_x0020_Penalty_x0020_Amount ?? item.DefaultPenaltyAmount ?? item.PenaltyAmount ?? localMatch?.defaultPenaltyAmount ?? 0;
+          const rawDesc = item.Offence_x0020_Description || item.Description || item.OffenceDescription || item.Title || localMatch?.description || '';
+          const rawTier = item.Tier || item.tier || localMatch?.tier || 'Tier 1';
+          const rawCat = item.Category || item.category || localMatch?.category || '';
+          const rawEscalation = item.Escalation_x0020_Trigger !== undefined ? Boolean(item.Escalation_x0020_Trigger) : (item.EscalationTrigger !== undefined ? Boolean(item.EscalationTrigger) : (localMatch?.escalationTrigger ?? true));
+
           return {
             id: String(item.Id || item.ID || ''),
             offenceName: liveTitle,
-            tier: item.Tier || localMatch?.tier || 'Tier 1',
-            category: item.Category || localMatch?.category || '',
-            description: item.Description || item.Title || localMatch?.description || '',
-            defaultPenaltyAmount: this.parsePenalty(item.DefaultPenaltyAmount ?? localMatch?.defaultPenaltyAmount ?? 0),
-            firstOffenceAction: item.FirstOffenceAction || localMatch?.firstOffenceAction || '',
-            secondOffenceAction: item.SecondOffenceAction || localMatch?.secondOffenceAction || '',
-            thirdOffenceAction: item.ThirdOffenceAction || localMatch?.thirdOffenceAction || '',
-            escalationTrigger: localMatch?.escalationTrigger ?? true
+            tier: rawTier,
+            category: rawCat,
+            description: rawDesc,
+            defaultPenaltyAmount: this.parsePenalty(rawPenalty),
+            firstOffenceAction: firstAction,
+            secondOffenceAction: secondAction,
+            thirdOffenceAction: thirdAction,
+            escalationTrigger: rawEscalation
           };
-        });
+        }).sort((a: PolicyOffence, b: PolicyOffence) => 
+          (a.offenceName || '').localeCompare(b.offenceName || '', undefined, { sensitivity: 'base' })
+        ).map((item: PolicyOffence, idx: number) => ({
+          ...item,
+          infractionCode: `INF-${String(idx + 1).padStart(3, '0')}`
+        }));
         this.setCached(cacheKey, res);
         return res;
       }
-      const res = policyData as PolicyOffence[];
+      const res = [...(policyData as PolicyOffence[])]
+        .sort((a, b) => (a.offenceName || '').localeCompare(b.offenceName || '', undefined, { sensitivity: 'base' }))
+        .map((item: PolicyOffence, idx: number) => ({
+          ...item,
+          infractionCode: `INF-${String(idx + 1).padStart(3, '0')}`
+        }));
       this.setCached(cacheKey, res);
       return res;
     } catch (error) {
       console.warn("Failed to fetch policy library from SharePoint, falling back to local JSON", error);
-      const res = policyData as PolicyOffence[];
+      const res = [...(policyData as PolicyOffence[])]
+        .sort((a, b) => (a.offenceName || '').localeCompare(b.offenceName || '', undefined, { sensitivity: 'base' }))
+        .map((item: PolicyOffence, idx: number) => ({
+          ...item,
+          infractionCode: `INF-${String(idx + 1).padStart(3, '0')}`
+        }));
       this.setCached(cacheKey, res);
       return res;
     }

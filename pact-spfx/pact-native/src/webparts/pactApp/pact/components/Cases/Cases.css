@@ -157,3 +157,100 @@
   text-align: center;
   color: var(--text-muted);
 }
+
+/* Tier badges */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tier-1 {
+  background: rgba(0, 120, 212, 0.15);
+  color: #0078d4;
+  border: 1px solid rgba(0, 120, 212, 0.3);
+}
+
+.tier-2 {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tier-3 {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Category badges */
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.category-conduct {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+}
+
+.category-ehsq {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.category-project {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+
+.category-strategic {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+/* Policy Filter tabs */
+.policy-filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.policy-tab-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface, rgba(255, 255, 255, 0.05));
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.policy-tab-btn:hover {
+  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary);
+}
+
+.policy-tab-btn.active {
+  background: var(--primary, #0078d4);
+  color: white;
+  border-color: var(--primary, #0078d4);
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+}
+

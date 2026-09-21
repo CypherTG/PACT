@@ -26,6 +26,7 @@ export interface ComplianceCase {
   escalationAppliedAt?: string;
   escalationFeeAmount?: number;
   totalAmountDue?: number;
+  noticeSentAt?: string;
 }
 
 // ─── List 02: Staff Directory ───────────────────────────────────────────────
@@ -45,6 +46,7 @@ export interface StaffMember {
 // ─── List 03: Policy & Offence Library ──────────────────────────────────────
 export interface PolicyOffence {
   id: string;
+  infractionCode?: string; // e.g. INF-001
   offenceName: string;     // Title
   tier: 'Tier 1' | 'Tier 2' | 'Tier 3';
   category: 'Conduct' | 'Project Integrity' | 'Strategic' | 'EHSQ';
