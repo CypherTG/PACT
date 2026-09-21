@@ -1307,8 +1307,8 @@ export class SharePointService {
     const tracker = await this.getRepeatTrackerRecord(newCase.chargedPerson);
     const policyTier = policy?.tier || '';
     
-    // Escalation flags
-    const isTier3Escalation = policyTier === 'Tier 3';
+    // Escalation flags: Same escalation process applies for all tiers (no immediate escalation)
+    const isTier3Escalation = policyTier === 'Tier 3' && escalationEngine.checkTier3Escalation(policyTier, tracker);
     const isTier2Escalation = policyTier === 'Tier 2' && escalationEngine.checkTier2Escalation(tracker);
     const isTier1Escalation = policyTier === 'Tier 1' && tracker
       ? escalationEngine.checkTier1Escalation(newCase.dateCreated, tracker)
@@ -1329,13 +1329,13 @@ export class SharePointService {
         let newTier = 'Tier 2';
         if (isTier3Escalation) {
           const t3Count = (tracker?.tier3Offences || 0) + 1;
-          reason = `Tier 3 Offence (${policy.offenceName}): Automatic escalation. Occurrence #${t3Count}. Immediate HR & Chairman review required.`;
+          reason = `Repeat Tier 3 Offence (${policy.offenceName}): Staff member reached ${t3Count} Tier 3 offences on record. Immediate HR & Chairman review required.`;
           newTier = 'Tier 3';
         } else if (isTier2Escalation) {
-          reason = `Repeat Tier 2 Offence (${policy.offenceName}): Staff member has ${(tracker?.tier2Offences || 0) + 1} Tier 2 offences on record.`;
+          reason = `Repeat Tier 2 Offence (${policy.offenceName}): Staff member reached ${(tracker?.tier2Offences || 0) + 1} Tier 2 offences on record. Escalated to Tier 3.`;
           newTier = 'Tier 3';
         } else {
-          reason = `Automatic Policy Trigger: Staff member reached 3+ Tier 1 offences within 6 months. Threshold exceeded on case ${newCase.title}.`;
+          reason = `Automatic Policy Trigger: Staff member reached 3+ Tier 1 offences within 6 months. Threshold exceeded on case ${newCase.title}. Escalated to Tier 2.`;
           newTier = 'Tier 2';
         }
 

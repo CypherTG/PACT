@@ -40,21 +40,56 @@ export class EscalationEngine {
   }
 
   /**
-   * Determine if a Tier 3 offence should always trigger an escalation.
+   * Determine if a Tier 3 offence escalation is required.
+   * Same escalation rules as Tier 1 (requires >= ESCALATION_THRESHOLD prior offences).
+   * No immediate escalation on 1st offence.
    */
-  public checkTier3Escalation(tier: string): boolean {
-    return tier === 'Tier 3';
+  public checkTier3Escalation(tier: string, tracker?: RepeatOffenceRecord | null, specificOffenceCount: number = 0): boolean {
+    if (specificOffenceCount > 0) {
+      return specificOffenceCount >= ESCALATION_THRESHOLD;
+    }
+    if (!tracker) return false;
+    return (tracker.tier3Offences || 0) >= ESCALATION_THRESHOLD;
   }
 
   /**
    * Determine if a Tier 2 repeat-offence escalation is required.
+   * Same escalation rules as Tier 1 (requires >= ESCALATION_THRESHOLD prior offences).
    */
   public checkTier2Escalation(tracker: RepeatOffenceRecord | null, specificOffenceCount: number = 0): boolean {
     if (specificOffenceCount > 0) {
       return specificOffenceCount >= ESCALATION_THRESHOLD;
     }
     if (!tracker) return false;
-    return tracker.tier2Offences >= ESCALATION_THRESHOLD;
+    return (tracker.tier2Offences || 0) >= ESCALATION_THRESHOLD;
+  }
+
+  /**
+   * Universal escalation check applying repeat threshold (3+ offences) escalation across all tiers.
+   * No immediate escalation for any tier.
+   */
+  public checkTierEscalation(
+    tier: string,
+    newCaseDate: string,
+    tracker: RepeatOffenceRecord | null,
+    specificOffenceCount: number = 0
+  ): boolean {
+    if (specificOffenceCount > 0) {
+      return specificOffenceCount >= ESCALATION_THRESHOLD;
+    }
+    if (!tracker) return false;
+
+    const normalizedTier = (tier || 'Tier 1').trim();
+    if (normalizedTier === 'Tier 1') {
+      return (tracker.tier1Last6Months || 0) >= ESCALATION_THRESHOLD;
+    }
+    if (normalizedTier === 'Tier 2') {
+      return (tracker.tier2Offences || 0) >= ESCALATION_THRESHOLD;
+    }
+    if (normalizedTier === 'Tier 3') {
+      return (tracker.tier3Offences || 0) >= ESCALATION_THRESHOLD;
+    }
+    return false;
   }
 
   /**
